@@ -34,3 +34,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 python3 wiener.py
 ```
+
+Получающийся график:
+
+![Wiener_process](pic/wiener_1000_paths.png)
