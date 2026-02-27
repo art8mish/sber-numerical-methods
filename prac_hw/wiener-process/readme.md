@@ -36,6 +36,15 @@ $B_0 = 0$ ($P$-п.н.)
 D[B_t] = \frac{1}{N-1} \sum_{i=1}^N (B_t^{i} - \bar{B_t})^2
 ```
 
+## Запуск
+
+```shell
+python3 -m venv --prompt wiener .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python3 wiener.py
+```
+
 Практические оценки на 1000 траекторий:
 
 ```shell
@@ -45,12 +54,3 @@ Variance: 0.8825
 Получающийся график симуляции Винеровского процесса вместе с оценкой дисперсии:
 
 ![Wiener_process](pic/wiener.png)
-
-## Запуск
-
-```shell
-python3 -m venv --prompt wiener .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python3 wiener.py
-```
