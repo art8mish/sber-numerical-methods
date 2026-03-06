@@ -6,13 +6,12 @@
 #include <limits>
 
 template<typename T>
-std::vector<T> generate_sample(size_t n, double mean, double stddev, unsigned seed = 42) {
+std::vector<T> generate_sample(size_t n, double mean, double stddev, unsigned seed = 777) {
     std::mt19937 gen(seed);
     std::normal_distribution<T> dist(mean, stddev);
-    std::vector<T> sample;
-    sample.reserve(n);
+    std::vector<T> sample (n);
     for (size_t i = 0; i < n; ++i) {
-        sample.push_back(dist(gen));
+        sample[i] = dist(gen);
     }
     return sample;
 }
@@ -85,9 +84,9 @@ void print_results(const std::vector<T>& sample, const std::string& label, doubl
     T one_pass = one_pass_variance(sample);
 
     std::cout << "Variance: " << true_var << "\n";
-    std::cout << "Fast variance: " << fast << ",  error = " << std::abs(fast - true_var) / true_var << "\n";
-    std::cout << "Two-pass:      " << two_pass << ",  error = " << std::abs(two_pass - true_var) / true_var << "\n";
-    std::cout << "One-pass:      " << one_pass << ",  error = " << std::abs(one_pass - true_var) / true_var << "\n";
+    std::cout << "Fast variance: " << fast << ",  error = " << std::fixed << std::setprecision(1) << std::abs(fast - true_var) / true_var * 100 << "%\n" << std::defaultfloat;
+    std::cout << "Two-pass:      " << two_pass << ",  error = " << std::fixed << std::setprecision(1) << std::abs(two_pass - true_var) / true_var * 100 << "%\n" << std::defaultfloat;
+    std::cout << "One-pass:      " << one_pass << ",  error = " << std::fixed << std::setprecision(1) << std::abs(one_pass - true_var) / true_var * 100 << "%\n" << std::defaultfloat;
 }
 
 struct Sample {
@@ -96,26 +95,36 @@ struct Sample {
     std::string description;
 };
 
+void run_experiment(size_t n, double mean, double stddev) {
+    std::vector<double> data_d = generate_sample<double>(n, mean, stddev);
+    std::vector<float> data_f (n);
+    for (size_t i = 0; i < n; ++i) 
+        data_f[i] = static_cast<float>(data_d[i]);
+
+    double err = stddev * stddev;
+    auto print_row = [&](std::string type, std::string method, double result) {
+        double rel_err = std::abs(result - err) / err;
+        std::cout << std::left << std::setw(8) << type 
+                  << std::setw(12) << method 
+                  << std::scientific << std::setprecision(6) << result 
+                  << " | Err: " << std::fixed << std::setprecision(1) << rel_err * 100 << "%" << std::defaultfloat << std::endl;
+    };
+
+    std::cout << "\n-------- Test: Mean=" << mean << ", StdDev=" << stddev << ") --------" << std::endl;
+    
+    print_row("Double", "Fast", fast_variance(data_d));
+    print_row("Double", "Two-Pass", two_pass_variance(data_d));
+    print_row("Double", "One-Pass", one_pass_variance(data_d));
+    std::cout << "------------------------------------------------" << std::endl;
+    print_row("Float",  "Fast", fast_variance(data_f));
+    print_row("Float",  "Two-Pass", two_pass_variance(data_f));
+    print_row("Float",  "One-Pass", one_pass_variance(data_f));
+    std::cout << "------------------------------------------------" << std::endl;
+}
 
 int main() {
-    Sample samples[] = {
-        {1.0, 1.0, "mean=1, stddev=1"},
-        {10.0, 0.1, "mean=10, stddev=0.1"},
-        {100.0, 0.01, "mean=100, stddev=0.01"}
-    };
-    const int N = 1000;
-
-    std::cout << "\nExperiments for float:\n";
-    for (const auto& s : samples) {
-        std::vector<float> sample_float = generate_sample<float>(N, s.mean, s.stddev);
-        print_results<float>(sample_float, s.description, s.stddev);
-    }
-
-    std::cout << "\nExperiments for double:\n";
-    for (const auto& s : samples) {
-        std::vector<double> sample_double = generate_sample<double>(N, s.mean, s.stddev);
-        print_results<double>(sample_double, s.description, s.stddev);
-    }
-
+    run_experiment(1000, 1.0, 1.0);
+    run_experiment(1000, 10.0, 0.1);
+    run_experiment(1000, 100.0, 0.01);
     return 0;
 }
