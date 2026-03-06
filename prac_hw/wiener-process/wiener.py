@@ -2,7 +2,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-SEED = 42
+SEED = 777
 
 T = 1.0
 DELTA = 0.0001
