@@ -12,16 +12,16 @@
 
 - Генерируем пары $(x_i, y_i)$, $i = 1,\dots,N$, где $x_i, y_i \stackrel{\text{i.i.d.}}{\sim} U(0,1)$.
 - Вычисляем индикатор попадания в четверть круга:
-  ```math
-  I_i = \begin{cases}
-  1, & x_i^2 + y_i^2 \le 1,\\
-  0, & \text{иначе}.
-  \end{cases}
-  ```
+```math
+I_i = \begin{cases}
+1, & x_i^2 + y_i^2 \le 1,\\
+0, & \text{иначе}.
+\end{cases}
+```
 - Оценка числа $\pi$:
-  ```math
-  \hat{\pi} = \frac{4}{N} \sum_{i=1}^{N} I_i.
-  ```
+```math
+\hat{\pi} = \frac{4}{N} \sum_{i=1}^{N} I_i.
+```
 
 В силу ЗБЧ $\hat{\pi} \to \pi$ при $N\to\infty$, а стандартная ошибка оценки убывает как $\mathcal{O}(1/\sqrt{N})$.
 
