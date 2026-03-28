@@ -95,18 +95,16 @@ struct Sample {
     std::string description;
 };
 
-void run_experiment(size_t n, double mean, double stddev) {
-    std::vector<double> data_d = generate_sample<double>(n, mean, stddev);
-    std::vector<float> data_f (n);
-    for (size_t i = 0; i < n; ++i) 
-        data_f[i] = static_cast<float>(data_d[i]);
+void run_experiment(size_t n, double mean, double stddev, unsigned seed = 777) {
+    std::vector<double> data_d = generate_sample<double>(n, mean, stddev, seed);
+    std::vector<float> data_f = generate_sample<float>(n, mean, stddev, seed);
 
     double err = stddev * stddev;
     auto print_row = [&](std::string type, std::string method, double result) {
         double rel_err = std::abs(result - err) / err;
         std::cout << std::left << std::setw(8) << type 
                   << std::setw(12) << method 
-                  << std::scientific << std::setprecision(6) << result 
+                  << std::scientific << std::setprecision(12) << result 
                   << " | Err: " << std::fixed << std::setprecision(1) << rel_err * 100 << "%" << std::defaultfloat << std::endl;
     };
 
