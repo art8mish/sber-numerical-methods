@@ -8,7 +8,6 @@ SEED = 777
 
 
 def box_muller_standard_normals(n):
-    """Пара независимых N(0,1) из пары U(0,1); векторизовано для n величин."""
     m = (n + 1) // 2
     u1 = np.random.random(m)
     u2 = np.random.random(m)
@@ -75,7 +74,7 @@ def demo_normal_lognormal(n_sample=100_000, mu=0.5, sigma=0.5):
     axes[2].grid(True, ls="--", alpha=0.5)
 
     fig.suptitle(
-        rf"Box–Muller $\to$ $G\sim N(\mu,\sigma^2)$, $L=\exp(G)$ ($\mu={mu}$, $\sigma={sigma}$, $n={n_sample}$)",
+        rf"Box-Muller $\to$ $G\sim N(\mu,\sigma^2)$, $L=\exp(G)$ ($\mu={mu}$, $\sigma={sigma}$, $n={n_sample}$)",
         y=1.02,
     )
     plt.tight_layout()
