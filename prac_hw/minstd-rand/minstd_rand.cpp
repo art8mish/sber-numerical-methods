@@ -14,12 +14,6 @@ constexpr uint32_t M = 2147483647u; // 2^31 - 1
 constexpr size_t BLOCK_SIZE = 16;
 volatile uint32_t RUNTIME_ZERO = 0u;
 
-#if defined(__GNUC__) || defined(__clang__)
-#define NOINLINE __attribute__((noinline))
-#else
-#define NOINLINE
-#endif
-
 uint32_t normalize_seed(uint32_t seed) {
     seed %= M;
     return seed == 0u ? 1u : seed;
@@ -39,7 +33,7 @@ double to_uniform_pm1(uint32_t x) {
     return 2.0 * (static_cast<double>(x) / static_cast<double>(M)) - 1.0;
 }
 
-NOINLINE uint64_t monte_carlo_scalar(size_t n_points, uint32_t seed) {
+uint64_t monte_carlo_scalar(size_t n_points, uint32_t seed) {
     uint32_t state = normalize_seed(seed) ^ RUNTIME_ZERO;
     uint64_t hits = 0;
 
@@ -55,7 +49,7 @@ NOINLINE uint64_t monte_carlo_scalar(size_t n_points, uint32_t seed) {
     return hits;
 }
 
-NOINLINE uint64_t monte_carlo_blocked(size_t n_points, uint32_t seed) {
+uint64_t monte_carlo_blocked(size_t n_points, uint32_t seed) {
     uint32_t state = normalize_seed(seed) ^ RUNTIME_ZERO;
     std::array<uint32_t, BLOCK_SIZE> powers{};
     powers[0] = A;
@@ -157,11 +151,11 @@ int main() {
     std::cout << std::fixed << std::setprecision(6);
     std::cout << "minstd_rand Monte-Carlo pi benchmark\n";
     std::cout << "Parameters: a=48271, m=2^31-1, seed=" << seed << ", N=" << n_points << "\n";
-    std::cout << "Scalar  : hits=" << hits_scalar << ", pi=" << pi_scalar << ", cycles=" << cycles_scalar
+    std::cout << "Scalar : hits=" << hits_scalar << ", pi=" << pi_scalar << ", cycles=" << cycles_scalar
               << "\n";
-    std::cout << "Blocked : hits=" << hits_blocked << ", pi=" << pi_blocked
+    std::cout << "Blocked: hits=" << hits_blocked << ", pi=" << pi_blocked
               << ", cycles=" << cycles_blocked << ", block_size=" << BLOCK_SIZE << "\n";
-    std::cout << "Speedup (scalar/blocked): " << speedup << "\n";
-    std::cout << "Abs(pi_scalar - pi_blocked): " << std::abs(pi_scalar - pi_blocked) << "\n";
+    std::cout << "Speedup : " << speedup << "\n";
+    std::cout << "Abs diff: " << std::abs(pi_scalar - pi_blocked) << "\n";
     return 0;
 }
