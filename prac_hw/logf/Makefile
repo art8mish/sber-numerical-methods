@@ -1,6 +1,6 @@
 
 CXX = g++
-CXXFLAGS = -Wall -Wextra -std=c++11
+CXXFLAGS = -Wall -Wextra -std=c++20
 TARGET = logf.o
 
 SOURCES = logf.cpp

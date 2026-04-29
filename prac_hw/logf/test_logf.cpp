@@ -1,9 +1,7 @@
-/*
- * logf tests: vs std::log(double), errno/FE vs libm, ULP <= 4.
- */
 
 #include <cerrno>
 #include <cfenv>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -75,12 +73,7 @@ bool test_special(float x) {
 }
 
 bool test_point_bits(uint32_t bits) {
-    union {
-        uint32_t u;
-        float f;
-    } xv;
-    xv.u = bits;
-    const float x = xv.f;
+    const float x = std::bit_cast<float>(bits);
     LibmRef ref = reference_log(static_cast<double>(x));
     feclearexcept(FE_ALL_EXCEPT);
     errno = 0;
@@ -106,12 +99,7 @@ bool test_interval(uint32_t lo, uint32_t hi, int n) {
         const uint32_t u =
             lo + static_cast<uint32_t>((span * static_cast<uint64_t>(i)) /
                                        static_cast<uint64_t>(n - 1));
-        union {
-            uint32_t bits;
-            float f;
-        } xv;
-        xv.bits = u;
-        const float x = xv.f;
+        const float x = std::bit_cast<float>(u);
         if (!(x > 0.f) || !std::isfinite(x)) {
             continue;
         }
@@ -146,7 +134,7 @@ int main() {
             return 1;
         }
     }
-    // Explicit edge cases mentioned in review.
+
     const uint32_t explicit_points[] = {
         0x3F7FFFFFu,  // closest float < 1.0
         0xBF800000u,  // -1.0
@@ -160,7 +148,7 @@ int main() {
             return 1;
         }
     }
-    // Dense neighborhood near 1.0 where small absolute errors inflate in ULP.
+
     if (!test_interval(0x3F700000u, 0x3F8FFFFFu, 20000)) {
         std::fputs("FAIL: interval near one\n", stderr);
         return 1;
