@@ -2,6 +2,8 @@ import numpy as np
 from scipy import stats
 
 SEED = 777
+rng_norm = np.random.default_rng(SEED)
+rng_bits = np.random.Generator(np.random.MT19937(SEED))
 
 def ks_test_normal(data):
     ks_stat, ks_p = stats.kstest(data, 'norm', args=(0, 1))
@@ -18,15 +20,23 @@ def two_level_test(generator, dist_test_func, n_samples=100, sample_size=1000, *
     return ks_p, p_values
 
 def normal_generator(size):
-    return np.random.normal(0, 1, size)
+    return rng_norm.normal(0, 1, size)
 
 def generate_bits(n_bits):
-    return np.random.randint(0, 2, n_bits)
+    n_words = (n_bits + 31) // 32
+    words = rng_bits.bit_generator.random_raw(n_words).astype(np.uint32)
+    bits = np.unpackbits(words.view(np.uint8), bitorder='little')
+    return bits[:n_bits]
+
+def bad_generate_bits(n_bits):
+    bad = generate_bits(n_bits).copy()
+    bad[::32] = 0
+    return bad
 
 def fourier_test(bits):
     n = len(bits)
     h = np.sqrt(2.9957 * n)
-    s = 2 * bits - 1 # to +1/-1
+    s = 2 * bits.astype(np.int8) - 1  # to +1/-1
     f = np.fft.fft(s)
     magnitude = np.abs(f)
     count = np.sum(magnitude < h)
@@ -49,11 +59,9 @@ def gaps_test(bits):
     ones = np.where(bits == 1)[0]
     if len(ones) < 2:
         return 1.0
-    gaps = np.diff(ones) - 1 # num of zeros between consecutive ones
-    # bins: 0,1,2,3,4,5 and more
+    gaps = np.diff(ones) - 1
     bins = [0, 1, 2, 3, 4, 5, np.inf]
     observed, _ = np.histogram(gaps, bins=bins)
-    # theoretical: p=0.5
     probs = [0.5**(k+1) for k in range(5)]
     probs.append(1 - sum(probs)) # tail
     expected = np.array(probs) * len(gaps)
@@ -74,19 +82,31 @@ def main():
 
     print("2) Bit sequence tests")
     ks_p_fourier, _ = two_level_test(generate_bits, fourier_test,
-                                      n_samples=50, sample_size=1024)
-    print(f"Fourier test, two-level p-value: {ks_p_fourier:.4f}")
+                                     n_samples=50, sample_size=1024)
+    print(f"Good RNG - Fourier test, two-level p-value: {ks_p_fourier:.4f}")
 
     ks_p_auto, _ = two_level_test(generate_bits, autocorrelation_test,
-                                   n_samples=50, sample_size=10000)
-    print(f"Autocorrelation (lag=1), two-level p-value: {ks_p_auto:.4f}")
+                                  n_samples=50, sample_size=10000)
+    print(f"Good RNG - Autocorrelation (lag=1), two-level p-value: {ks_p_auto:.4f}")
 
     ks_p_gaps, _ = two_level_test(generate_bits, gaps_test,
-                                   n_samples=50, sample_size=10000)
-    print(f"Gaps test, two-level p-value: {ks_p_gaps:.4f}")
+                                  n_samples=50, sample_size=10000)
+    print(f"Good RNG - Gaps test, two-level p-value: {ks_p_gaps:.4f}")
+
+    print("3) Bad generator demo")
+    bad_fourier, _ = two_level_test(bad_generate_bits, fourier_test,
+                                    n_samples=50, sample_size=1024)
+    print(f"Bad RNG  - Fourier test, two-level p-value: {bad_fourier:.4f}")
+
+    bad_auto, _ = two_level_test(bad_generate_bits, autocorrelation_test,
+                                 n_samples=50, sample_size=10000)
+    print(f"Bad RNG  - Autocorrelation (lag=1), two-level p-value: {bad_auto:.4f}")
+
+    bad_gaps, _ = two_level_test(bad_generate_bits, gaps_test,
+                                 n_samples=50, sample_size=10000)
+    print(f"Bad RNG  - Gaps test, two-level p-value: {bad_gaps:.4f}")
 
 if __name__ == "__main__":
-    np.random.seed(777)
     main()
 
     

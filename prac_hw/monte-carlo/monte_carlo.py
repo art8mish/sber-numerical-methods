@@ -36,7 +36,6 @@ def lognormal_pdf(x, mu, sigma):
 
 
 def demo_normal_lognormal(n_sample=100_000, mu=0.5, sigma=0.5):
-    """G = mu + sigma * Z, L = exp(G); ln(L) снова N(mu, sigma^2)."""
     z = box_muller_standard_normals(n_sample)
     g = mu + sigma * z
     L = np.exp(g)
