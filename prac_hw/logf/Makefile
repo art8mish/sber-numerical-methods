@@ -5,7 +5,6 @@ TARGET = logf.o
 
 SOURCES = logf.cpp
 
-# Тест: ULP vs std::log(double), errno/FE как у libm (без встроенной оптимизации log).
 TEST_SRC = test_logf.cpp
 TEST_BIN = test_logf
 TESTFLAGS = -fno-builtin-log -fno-builtin-logf

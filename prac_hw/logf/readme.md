@@ -21,7 +21,7 @@ float logf (float x) {
 
 ## Особые случаи
 
-При $x \leq 0$ (включая $−0$): для нуля - $-\infty$ с `errno = ERANGE`, `FE_DIVBYZERO`; для отрицательного - NaN с `errno = EDOM`, `FE_INVALID` (как при вызове `log` из libm). Значения $+\infty$ и NaN возвращаются как есть, без установки `errno`.
+При $x \leq 0$ (включая $−0$): для нуля возвращается $-\infty$ с `errno = ERANGE`, `FE_DIVBYZERO`. Для отрицательного значения возвращается NaN с `errno = EDOM`, `FE_INVALID` (как при вызове `log` из libm). Значения $+\infty$ и NaN возвращаются как есть, без установки `errno`.
 
 ## Сборка
 
