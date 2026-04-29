@@ -64,4 +64,3 @@ make
 - Флаги компиляции: `-O3 -Wall -Wextra -std=c++17 -march=native`;
 - Строка компиляции: `g++ -O3 -Wall -Wextra -std=c++17 -march=native -o matrix matrix.cpp`.
 
-

@@ -79,7 +79,7 @@ L = e^G.
 
 ![Normal and lognormal](pics/normal_lognormal.png)
 
-### Математическая связь $N(\mu,\sigma^2)$ и LogNormal $(\mu,\sigma^2)$
+### Связь $N(\mu,\sigma^2)$ и LogNormal $(\mu,\sigma^2)$
 
 Пусть
 ```math
