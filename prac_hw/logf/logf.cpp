@@ -1,12 +1,14 @@
 #include <cerrno>
 #include <cfenv>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 
 namespace {
 
 constexpr double LN2 =
     0.693147180559945309417232121458176568075500134360255254120680009;
+constexpr double SQRT2 = 1.4142135623730950488016887242096980785696718753769;
 
 // ln(r), r in [1, 2): ln(r) = 2*atanh(u), u = (r-1)/(r+1), u in [0, 1/3].
 double log_mantissa(double r) {
@@ -27,28 +29,11 @@ double log_mantissa(double r) {
     return 2.0 * (u * q);
 }
 
-float uint32_to_float(uint32_t bits) {
-    union {
-        uint32_t u;
-        float f;
-    } c;
-    c.u = bits;
-    return c.f;
-}
-
-uint32_t float_to_uint32(float x) {
-    union {
-        float f;
-        uint32_t u;
-    } c;
-    c.f = x;
-    return c.u;
-}
-
 }  // namespace
 
 extern "C" float logf(float x) {
-    const uint32_t ix = float_to_uint32(x);
+    uint32_t ix = 0u;
+    std::memcpy(&ix, &x, sizeof(ix));
     // 0x7FFFFFFFu = 0111 1111 1111 1111 1111 1111 1111 1111
     const uint32_t abs_ix = ix & 0x7FFFFFFFu; 
 
@@ -92,9 +77,14 @@ extern "C" float logf(float x) {
     // 0x3F800000u = 0011 1111 1000 0000 0000 0000 0000 0000 (1.0)
     // 0x007FFFFFu = 0000 0000 0111 1111 1111 1111 1111 1111 
     const uint32_t rbits = 0x3F800000u | (mx & 0x007FFFFFu);
-    const float r = uint32_to_float(rbits);
-
-    const double lnr = log_mantissa(static_cast<double>(r));
+    float rf = 0.0f;
+    std::memcpy(&rf, &rbits, sizeof(rf));
+    double r = static_cast<double>(rf);
+    if (r > SQRT2) {
+        r *= 0.5;
+        ++e;
+    }
+    const double lnr = log_mantissa(r);
     const double y = static_cast<double>(e) * LN2 + lnr;
     return static_cast<float>(y);
 }

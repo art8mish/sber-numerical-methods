@@ -74,6 +74,29 @@ bool test_special(float x) {
     return ulp_error(y, ref.value) <= MAX_ULP;
 }
 
+bool test_point_bits(uint32_t bits) {
+    union {
+        uint32_t u;
+        float f;
+    } xv;
+    xv.u = bits;
+    const float x = xv.f;
+    LibmRef ref = reference_log(static_cast<double>(x));
+    feclearexcept(FE_ALL_EXCEPT);
+    errno = 0;
+    const float y = logf(x);
+    if (ref.errno_after != errno) {
+        return false;
+    }
+    if (!same_fe_mask(ref.fe_after, fetestexcept(FE_ALL_EXCEPT))) {
+        return false;
+    }
+    if (std::isnan(static_cast<double>(y)) && std::isnan(ref.value)) {
+        return true;
+    }
+    return ulp_error(y, ref.value) <= MAX_ULP;
+}
+
 bool test_interval(uint32_t lo, uint32_t hi, int n) {
     if (lo > hi || n < 2) {
         return false;
@@ -122,6 +145,25 @@ int main() {
             std::fputs("FAIL: special\n", stderr);
             return 1;
         }
+    }
+    // Explicit edge cases mentioned in review.
+    const uint32_t explicit_points[] = {
+        0x3F7FFFFFu,  // closest float < 1.0
+        0xBF800000u,  // -1.0
+        0xFF800000u,  // -inf
+        0x80000001u,  // negative smallest subnormal
+        0x807FFFFFu,  // negative largest subnormal
+    };
+    for (uint32_t u : explicit_points) {
+        if (!test_point_bits(u)) {
+            std::fputs("FAIL: explicit point\n", stderr);
+            return 1;
+        }
+    }
+    // Dense neighborhood near 1.0 where small absolute errors inflate in ULP.
+    if (!test_interval(0x3F700000u, 0x3F8FFFFFu, 20000)) {
+        std::fputs("FAIL: interval near one\n", stderr);
+        return 1;
     }
 
     const int pts = 1000;
