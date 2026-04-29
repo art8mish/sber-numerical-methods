@@ -7,8 +7,12 @@
 
 Генератор: 
 ```math
-x_{i+1} = a \cdot x_i \text{mod} m, \\
-a = 48271 \\
+x_{i+1} = a \cdot x_i \text{mod} m,
+```
+```math
+a = 48271
+```
+```math
 m = 2^31 - 1 = 2147483647
 ```
 
