@@ -27,7 +27,7 @@ C_{ij} = \sum_{p=0}^{k-1} A_{ip} \cdot B_{pj}
 
 > `speedup = naive_cycles / blocked_cycles`
 
-В качестве метрики совпадения результата считается Max-норма по разнице матрци:
+В качестве метрики совпадения результата считается Max-норма по разнице матриц:
 
 > `max_abs_diff = max |C_naive - C_blocked|`.
 
@@ -39,7 +39,7 @@ make
 ./matrix
 ```
 
-Параметры сборки: `-O3 -march=native -std=c++17`.
+Параметры сборки: `-O3 -march=native -std=c++17`
 
 ## Результаты
 
