@@ -9,6 +9,6 @@ $(TARGET): $(SOURCES)
 	$(CXX) $(CXXFLAGS) -o $(TARGET) $(SOURCES)
 
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGET) $(BENCH_LOOP)
 
-.PHONY: all clean
+.PHONY: all clean bench-order

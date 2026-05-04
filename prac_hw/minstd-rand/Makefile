@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -O3 -Wall -Wextra -std=c++17 -march=native
+CXXFLAGS = -O3 -Wall -Wextra -std=c++17 -march=native -fopenmp
 TARGET = minstd_rand
 SOURCES = minstd_rand.cpp
 
