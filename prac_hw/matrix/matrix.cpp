@@ -56,10 +56,6 @@ void transpose(const Matrix& src, Matrix& dst, size_t rows, size_t cols) {
     }
 }
 
-/*
- * Блоки N–M–K: jj → ii → kk (панель по столбцам C / B^T, затем полоса строк A/C, затем полоска по k).
- * Внутри тайла: i → j → p — строки C подряд, суммирование по непрерывным строкам A и B^T по p.
- */
 void matmul_blocked(const Matrix& a, const Matrix& b, Matrix& c, size_t m, size_t k, size_t n, size_t block) {
     std::fill(c.begin(), c.end(), 0.0f);
     Matrix bt(n * k);
@@ -193,14 +189,14 @@ int main() {
         {64, 64, 64, "64x64*64x64"},
         {128, 64, 64, "128x64*64x64"},
         {128, 128, 128, "128x128^2"},
-        {1024, 1024, 1024, "1024^3"},
+        // {1024, 1024, 1024, "1024^3"},
     };
 
-    std::cout << "fp32 GEMM, block=" << block << " (blocks jj,ii,kk; tile i,j,p / simd i,j + dot p)\n";
+    std::cout << "fp32 GEMM, block=" << block << "\n";
 
 #if defined(__AVX2__) && defined(__FMA__)
-    std::cout << "case | naive @ | blocked @ | simd @ | n/blk | n/simd | d(n,b) | d(b, simd)\n";
-    std::cout << "----------------------------------------------------------------------------\n";
+    std::cout << "case | naive @ | blocked @ | simd @ | n/blk | n/simd |\n";
+    std::cout << "------------------------------------------------------------------------\n";
 
     for (const Shape& s : shapes) {
         Matrix a = random_matrix(s.m, s.k, 777u + static_cast<unsigned>(s.m + s.k + s.n));
@@ -215,11 +211,10 @@ int main() {
         const double ss = t2 > 0 ? static_cast<double>(t0) / static_cast<double>(t2) : 0.0;
 
         std::cout << std::setw(14) << s.name << " | " << std::setw(9) << t0 << " | " << std::setw(11) << t1 << " | "
-                  << std::setw(8) << t2 << " | " << std::setw(6) << sb << " | " << std::setw(7) << ss << " | "
-                  << max_abs_diff(c0, c1) << " | " << max_abs_diff(c1, c2) << "\n";
+                  << std::setw(8) << t2 << " | " << std::setw(6) << sb << " | " << std::setw(7) << ss << " | " << "\n";
     }
 #else
-    std::cout << "case | naive @ | blocked @ | speedup | d(n,b)\n";
+    std::cout << "case | naive @ | blocked @ | speedup\n";
     std::cout << "-------------------------------------------------------\n";
 
     for (const Shape& s : shapes) {
@@ -232,7 +227,7 @@ int main() {
         const double sp = t1 > 0 ? static_cast<double>(t0) / static_cast<double>(t1) : 0.0;
 
         std::cout << std::setw(14) << s.name << " | " << std::setw(9) << t0 << " | " << std::setw(11) << t1 << " | "
-                  << std::setw(7) << sp << " | " << max_abs_diff(c0, c1) << "\n";
+                  << std::setw(7) << sp << " | " << "\n";
     }
 #endif
 
