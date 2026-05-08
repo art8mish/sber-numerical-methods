@@ -58,20 +58,109 @@ void transpose(const Matrix& src, Matrix& dst, size_t rows, size_t cols) {
 
 void matmul_blocked(const Matrix& a, const Matrix& b, Matrix& c, size_t m, size_t k, size_t n, size_t block) {
     std::fill(c.begin(), c.end(), 0.0f);
-    Matrix bt(n * k);
-    transpose(b, bt, k, n);
-
     for (size_t jj = 0; jj < n; jj += block) {
-        for (size_t ii = 0; ii < m; ii += block) {
-            for (size_t kk = 0; kk < k; kk += block) {
+        for (size_t kk = 0; kk < k; kk += block) {
+            for (size_t ii = 0; ii < m; ii += block) {
                 const size_t i_end = std::min(ii + block, m);
                 const size_t j_end = std::min(jj + block, n);
                 const size_t k_end = std::min(kk + block, k);
                 for (size_t i = ii; i < i_end; ++i) {
-                    for (size_t j = jj; j < j_end; ++j) {
+                    for (size_t p = kk; p < k_end; ++p) {
+                        const Value aip = a[idx(i, p, k)];
+                        for (size_t j = jj; j < j_end; ++j) {
+                            c[idx(i, j, n)] += aip * b[idx(p, j, n)];
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#if defined(__AVX2__) && defined(__FMA__)
+void matmul_blocked_simd(const Matrix& a, const Matrix& b, Matrix& c, size_t m, size_t k, size_t n, size_t block) {
+    std::fill(c.begin(), c.end(), 0.0f);
+    for (size_t jj = 0; jj < n; jj += block) {
+        for (size_t kk = 0; kk < k; kk += block) {
+            for (size_t ii = 0; ii < m; ii += block) {
+                const size_t i_end = std::min(ii + block, m);
+                const size_t j_end = std::min(jj + block, n);
+                const size_t k_end = std::min(kk + block, k);
+
+                size_t i = ii;
+                for (; i + 1 < i_end; i += 2) {
+                    size_t j = jj;
+                    for (; j + 16 <= j_end; j += 16) {
+                        __m256 vc00 = _mm256_loadu_ps(&c[idx(i + 0, j + 0, n)]);
+                        __m256 vc01 = _mm256_loadu_ps(&c[idx(i + 0, j + 8, n)]);
+                        __m256 vc10 = _mm256_loadu_ps(&c[idx(i + 1, j + 0, n)]);
+                        __m256 vc11 = _mm256_loadu_ps(&c[idx(i + 1, j + 8, n)]);
+                        for (size_t p = kk; p < k_end; ++p) {
+                            const __m256 vb0 = _mm256_loadu_ps(&b[idx(p, j + 0, n)]);
+                            const __m256 vb1 = _mm256_loadu_ps(&b[idx(p, j + 8, n)]);
+                            const __m256 va0 = _mm256_set1_ps(a[idx(i + 0, p, k)]);
+                            const __m256 va1 = _mm256_set1_ps(a[idx(i + 1, p, k)]);
+                            vc00 = _mm256_fmadd_ps(va0, vb0, vc00);
+                            vc01 = _mm256_fmadd_ps(va0, vb1, vc01);
+                            vc10 = _mm256_fmadd_ps(va1, vb0, vc10);
+                            vc11 = _mm256_fmadd_ps(va1, vb1, vc11);
+                        }
+                        _mm256_storeu_ps(&c[idx(i + 0, j + 0, n)], vc00);
+                        _mm256_storeu_ps(&c[idx(i + 0, j + 8, n)], vc01);
+                        _mm256_storeu_ps(&c[idx(i + 1, j + 0, n)], vc10);
+                        _mm256_storeu_ps(&c[idx(i + 1, j + 8, n)], vc11);
+                    }
+                    for (; j + 8 <= j_end; j += 8) {
+                        __m256 vc0 = _mm256_loadu_ps(&c[idx(i + 0, j, n)]);
+                        __m256 vc1 = _mm256_loadu_ps(&c[idx(i + 1, j, n)]);
+                        for (size_t p = kk; p < k_end; ++p) {
+                            const __m256 vb = _mm256_loadu_ps(&b[idx(p, j, n)]);
+                            const __m256 va0 = _mm256_set1_ps(a[idx(i + 0, p, k)]);
+                            const __m256 va1 = _mm256_set1_ps(a[idx(i + 1, p, k)]);
+                            vc0 = _mm256_fmadd_ps(va0, vb, vc0);
+                            vc1 = _mm256_fmadd_ps(va1, vb, vc1);
+                        }
+                        _mm256_storeu_ps(&c[idx(i + 0, j, n)], vc0);
+                        _mm256_storeu_ps(&c[idx(i + 1, j, n)], vc1);
+                    }
+                    for (; j < j_end; ++j) {
+                        Value sum0 = c[idx(i + 0, j, n)];
+                        Value sum1 = c[idx(i + 1, j, n)];
+                        for (size_t p = kk; p < k_end; ++p) {
+                            const Value bpj = b[idx(p, j, n)];
+                            sum0 += a[idx(i + 0, p, k)] * bpj;
+                            sum1 += a[idx(i + 1, p, k)] * bpj;
+                        }
+                        c[idx(i + 0, j, n)] = sum0;
+                        c[idx(i + 1, j, n)] = sum1;
+                    }
+                }
+
+                for (; i < i_end; ++i) {
+                    size_t j = jj;
+                    for (; j + 16 <= j_end; j += 16) {
+                        __m256 vc0 = _mm256_loadu_ps(&c[idx(i, j + 0, n)]);
+                        __m256 vc1 = _mm256_loadu_ps(&c[idx(i, j + 8, n)]);
+                        for (size_t p = kk; p < k_end; ++p) {
+                            const __m256 va = _mm256_set1_ps(a[idx(i, p, k)]);
+                            vc0 = _mm256_fmadd_ps(va, _mm256_loadu_ps(&b[idx(p, j + 0, n)]), vc0);
+                            vc1 = _mm256_fmadd_ps(va, _mm256_loadu_ps(&b[idx(p, j + 8, n)]), vc1);
+                        }
+                        _mm256_storeu_ps(&c[idx(i, j + 0, n)], vc0);
+                        _mm256_storeu_ps(&c[idx(i, j + 8, n)], vc1);
+                    }
+                    for (; j + 8 <= j_end; j += 8) {
+                        __m256 vc = _mm256_loadu_ps(&c[idx(i, j, n)]);
+                        for (size_t p = kk; p < k_end; ++p) {
+                            const __m256 va = _mm256_set1_ps(a[idx(i, p, k)]);
+                            vc = _mm256_fmadd_ps(va, _mm256_loadu_ps(&b[idx(p, j, n)]), vc);
+                        }
+                        _mm256_storeu_ps(&c[idx(i, j, n)], vc);
+                    }
+                    for (; j < j_end; ++j) {
                         Value sum = c[idx(i, j, n)];
                         for (size_t p = kk; p < k_end; ++p) {
-                            sum += a[idx(i, p, k)] * bt[idx(j, p, k)];
+                            sum += a[idx(i, p, k)] * b[idx(p, j, n)];
                         }
                         c[idx(i, j, n)] = sum;
                     }
@@ -81,57 +170,73 @@ void matmul_blocked(const Matrix& a, const Matrix& b, Matrix& c, size_t m, size_
     }
 }
 
-#if defined(__AVX2__) && defined(__FMA__)
-float sum_avx2(__m256 v) {
-    __m128 hi = _mm256_extractf128_ps(v, 1);
-    __m128 lo = _mm256_castps256_ps128(v);
-    __m128 s = _mm_add_ps(lo, hi);
-    s = _mm_hadd_ps(s, s);
-    s = _mm_hadd_ps(s, s);
-    return _mm_cvtss_f32(s);
-}
-
-void dot_avx2_fma(const Matrix& a, const Matrix& bt, size_t kcols, size_t i, size_t j, size_t k0,
-                                 size_t k1, Value* acc) {
-    __m256 s0 = _mm256_setzero_ps();
-    __m256 s1 = _mm256_setzero_ps();
-    size_t p = k0;
-    for (; p + 16 <= k1; p += 16) {
-        const __m256 va0 = _mm256_loadu_ps(&a[idx(i, p, kcols)]);
-        const __m256 va1 = _mm256_loadu_ps(&a[idx(i, p + 8, kcols)]);
-        const __m256 vb0 = _mm256_loadu_ps(&bt[idx(j, p, kcols)]);
-        const __m256 vb1 = _mm256_loadu_ps(&bt[idx(j, p + 8, kcols)]);
-        s0 = _mm256_fmadd_ps(va0, vb0, s0);
-        s1 = _mm256_fmadd_ps(va1, vb1, s1);
-    }
-    __m256 sumv = _mm256_add_ps(s0, s1);
-    for (; p + 8 <= k1; p += 8) {
-        const __m256 va = _mm256_loadu_ps(&a[idx(i, p, kcols)]);
-        const __m256 vb = _mm256_loadu_ps(&bt[idx(j, p, kcols)]);
-        sumv = _mm256_fmadd_ps(va, vb, sumv);
-    }
-    float part = sum_avx2(sumv);
-    for (; p < k1; ++p)
-        part += a[idx(i, p, kcols)] * bt[idx(j, p, kcols)];
-    *acc += part;
-}
-
-void matmul_blocked_simd(const Matrix& a, const Matrix& b, Matrix& c, size_t m, size_t k, size_t n, size_t block) {
+// Same blocking and loop order as matmul_blocked: i, then p, then j (SIMD over j; load/fma/store C each p).
+void matmul_blocked_simd_ipj(const Matrix& a, const Matrix& b, Matrix& c, size_t m, size_t k, size_t n, size_t block) {
     std::fill(c.begin(), c.end(), 0.0f);
-    Matrix bt(n * k);
-    transpose(b, bt, k, n);
-
     for (size_t jj = 0; jj < n; jj += block) {
-        for (size_t ii = 0; ii < m; ii += block) {
-            for (size_t kk = 0; kk < k; kk += block) {
+        for (size_t kk = 0; kk < k; kk += block) {
+            for (size_t ii = 0; ii < m; ii += block) {
                 const size_t i_end = std::min(ii + block, m);
                 const size_t j_end = std::min(jj + block, n);
                 const size_t k_end = std::min(kk + block, k);
-                for (size_t i = ii; i < i_end; ++i) {
-                    for (size_t j = jj; j < j_end; ++j) {
-                        Value sum = c[idx(i, j, n)];
-                        dot_avx2_fma(a, bt, k, i, j, kk, k_end, &sum);
-                        c[idx(i, j, n)] = sum;
+                size_t i = ii;
+                for (; i + 1 < i_end; i += 2) {
+                    for (size_t p = kk; p < k_end; ++p) {
+                        const __m256 va0 = _mm256_set1_ps(a[idx(i + 0, p, k)]);
+                        const __m256 va1 = _mm256_set1_ps(a[idx(i + 1, p, k)]);
+                        size_t j = jj;
+                        for (; j + 16 <= j_end; j += 16) {
+                            __m256 vc00 = _mm256_loadu_ps(&c[idx(i + 0, j + 0, n)]);
+                            __m256 vc01 = _mm256_loadu_ps(&c[idx(i + 0, j + 8, n)]);
+                            __m256 vc10 = _mm256_loadu_ps(&c[idx(i + 1, j + 0, n)]);
+                            __m256 vc11 = _mm256_loadu_ps(&c[idx(i + 1, j + 8, n)]);
+                            const __m256 vb0 = _mm256_loadu_ps(&b[idx(p, j + 0, n)]);
+                            const __m256 vb1 = _mm256_loadu_ps(&b[idx(p, j + 8, n)]);
+                            vc00 = _mm256_fmadd_ps(va0, vb0, vc00);
+                            vc01 = _mm256_fmadd_ps(va0, vb1, vc01);
+                            vc10 = _mm256_fmadd_ps(va1, vb0, vc10);
+                            vc11 = _mm256_fmadd_ps(va1, vb1, vc11);
+                            _mm256_storeu_ps(&c[idx(i + 0, j + 0, n)], vc00);
+                            _mm256_storeu_ps(&c[idx(i + 0, j + 8, n)], vc01);
+                            _mm256_storeu_ps(&c[idx(i + 1, j + 0, n)], vc10);
+                            _mm256_storeu_ps(&c[idx(i + 1, j + 8, n)], vc11);
+                        }
+                        for (; j + 8 <= j_end; j += 8) {
+                            __m256 vc0 = _mm256_loadu_ps(&c[idx(i + 0, j, n)]);
+                            __m256 vc1 = _mm256_loadu_ps(&c[idx(i + 1, j, n)]);
+                            const __m256 vb = _mm256_loadu_ps(&b[idx(p, j, n)]);
+                            vc0 = _mm256_fmadd_ps(va0, vb, vc0);
+                            vc1 = _mm256_fmadd_ps(va1, vb, vc1);
+                            _mm256_storeu_ps(&c[idx(i + 0, j, n)], vc0);
+                            _mm256_storeu_ps(&c[idx(i + 1, j, n)], vc1);
+                        }
+                        for (; j < j_end; ++j) {
+                            const Value bpj = b[idx(p, j, n)];
+                            c[idx(i + 0, j, n)] += a[idx(i + 0, p, k)] * bpj;
+                            c[idx(i + 1, j, n)] += a[idx(i + 1, p, k)] * bpj;
+                        }
+                    }
+                }
+                for (; i < i_end; ++i) {
+                    for (size_t p = kk; p < k_end; ++p) {
+                        const __m256 va = _mm256_set1_ps(a[idx(i, p, k)]);
+                        size_t j = jj;
+                        for (; j + 16 <= j_end; j += 16) {
+                            __m256 vc0 = _mm256_loadu_ps(&c[idx(i, j + 0, n)]);
+                            __m256 vc1 = _mm256_loadu_ps(&c[idx(i, j + 8, n)]);
+                            vc0 = _mm256_fmadd_ps(va, _mm256_loadu_ps(&b[idx(p, j + 0, n)]), vc0);
+                            vc1 = _mm256_fmadd_ps(va, _mm256_loadu_ps(&b[idx(p, j + 8, n)]), vc1);
+                            _mm256_storeu_ps(&c[idx(i, j + 0, n)], vc0);
+                            _mm256_storeu_ps(&c[idx(i, j + 8, n)], vc1);
+                        }
+                        for (; j + 8 <= j_end; j += 8) {
+                            __m256 vc = _mm256_loadu_ps(&c[idx(i, j, n)]);
+                            vc = _mm256_fmadd_ps(va, _mm256_loadu_ps(&b[idx(p, j, n)]), vc);
+                            _mm256_storeu_ps(&c[idx(i, j, n)], vc);
+                        }
+                        for (; j < j_end; ++j) {
+                            c[idx(i, j, n)] += a[idx(i, p, k)] * b[idx(p, j, n)];
+                        }
                     }
                 }
             }
@@ -185,33 +290,35 @@ int main() {
     std::cout << std::fixed << std::setprecision(4);
     const size_t block = 16;
     const std::vector<Shape> shapes = {
-        {32, 64, 16, "32x64*64x16"},
-        {64, 64, 64, "64x64*64x64"},
-        {128, 64, 64, "128x64*64x64"},
-        {128, 128, 128, "128x128^2"},
-        // {1024, 1024, 1024, "1024^3"},
+        {32, 64, 16, "32x64@64x16"},
+        {64, 64, 64, "64x64@64x64"},
+        {128, 64, 64, "128x64@64x64"},
+        {128, 128, 128, "128x128@128x128"},
+        // {1024, 1024, 1024, "1024x1024^2"},
     };
 
     std::cout << "fp32 GEMM, block=" << block << "\n";
 
 #if defined(__AVX2__) && defined(__FMA__)
-    std::cout << "case | naive @ | blocked @ | simd @ | n/blk | n/simd |\n";
-    std::cout << "------------------------------------------------------------------------\n";
+    std::cout << std::setw(15) << "case" << " | " << std::setw(9) << "naive @" << " | " << std::setw(11) << "blocked @" << " | "  << std::setw(11) << "simd_ipj @" << " | " << std::setw(8) << "simd @" << " | " << std::setw(6) << "n/blk" << " | " << std::setw(9) << "n/simd_ipj"  << " | " << std::setw(7) << "n/simd" << " | " << "\n";
+    std::cout << std::string(105, '-') << "\n";
 
     for (const Shape& s : shapes) {
         Matrix a = random_matrix(s.m, s.k, 777u + static_cast<unsigned>(s.m + s.k + s.n));
         Matrix b = random_matrix(s.k, s.n, 999u + static_cast<unsigned>(s.m + s.k + s.n));
-        Matrix c0(s.m * s.n), c1(s.m * s.n), c2(s.m * s.n);
+        Matrix c0(s.m * s.n), c1(s.m * s.n), c2(s.m * s.n), c3(s.m * s.n);
 
         const uint64_t t0 = benchmark_cycles([&]() { matmul_naive(a, b, c0, s.m, s.k, s.n); });
         const uint64_t t1 = benchmark_cycles([&]() { matmul_blocked(a, b, c1, s.m, s.k, s.n, block); });
         const uint64_t t2 = benchmark_cycles([&]() { matmul_blocked_simd(a, b, c2, s.m, s.k, s.n, block); });
+        const uint64_t t3 = benchmark_cycles([&]() { matmul_blocked_simd_ipj(a, b, c3, s.m, s.k, s.n, block); });
 
         const double sb = t1 > 0 ? static_cast<double>(t0) / static_cast<double>(t1) : 0.0;
         const double ss = t2 > 0 ? static_cast<double>(t0) / static_cast<double>(t2) : 0.0;
+        const double sipj = t3 > 0 ? static_cast<double>(t0) / static_cast<double>(t3) : 0.0;
 
-        std::cout << std::setw(14) << s.name << " | " << std::setw(9) << t0 << " | " << std::setw(11) << t1 << " | "
-                  << std::setw(8) << t2 << " | " << std::setw(6) << sb << " | " << std::setw(7) << ss << " | " << "\n";
+        std::cout << std::setw(15) << s.name << " | " << std::setw(9) << t0 << " | " << std::setw(11) << t1 << " | "
+            << std::setw(11) << t3 << " | " << std::setw(8) << t2 << " | " << std::setw(6) << sb << " | " << std::setw(9) << sipj << " | " << std::setw(7) << ss << " | "  << "\n";
     }
 #else
     std::cout << "case | naive @ | blocked @ | speedup\n";
