@@ -170,7 +170,6 @@ void matmul_blocked_simd(const Matrix& a, const Matrix& b, Matrix& c, size_t m, 
     }
 }
 
-// Same blocking and loop order as matmul_blocked: i, then p, then j (SIMD over j; load/fma/store C each p).
 void matmul_blocked_simd_ipj(const Matrix& a, const Matrix& b, Matrix& c, size_t m, size_t k, size_t n, size_t block) {
     std::fill(c.begin(), c.end(), 0.0f);
     for (size_t jj = 0; jj < n; jj += block) {
