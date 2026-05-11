@@ -55,9 +55,7 @@ inline void pin_thread_to_cpu0() {
 #endif
 }
 
-
-template <std::size_t LANES>
-std::uint64_t bench_scalar(std::size_t iters, LogfFn f) {
+template <std::size_t LANES> std::uint64_t bench_scalar(std::size_t iters, LogfFn f) {
     static_assert(LANES >= 1);
     std::array<float, LANES> x{};
     for (std::size_t j = 0; j < LANES; ++j)
@@ -77,8 +75,8 @@ std::uint64_t bench_scalar(std::size_t iters, LogfFn f) {
 }
 
 inline __m256 init_vec(float base) {
-    return _mm256_setr_ps(base + 0.00f, base + 0.10f, base + 0.20f, base + 0.30f,
-                          base + 0.40f, base + 0.50f, base + 0.60f, base + 0.70f);
+    return _mm256_setr_ps(base + 0.00f, base + 0.10f, base + 0.20f, base + 0.30f, base + 0.40f,
+                          base + 0.50f, base + 0.60f, base + 0.70f);
 }
 
 inline float reduce_first(__m256 v) {
@@ -107,12 +105,10 @@ template <std::size_t LANES> std::uint64_t bench_vector(std::size_t iters) {
     return t2 - t1;
 }
 
-
 constexpr int WARMUP_RUNS = 4;
 constexpr int MEASURE_RUNS = 13;
 
-template <typename Kernel>
-std::vector<double> collect(std::size_t ops_per_run, Kernel kernel) {
+template <typename Kernel> std::vector<double> collect(std::size_t ops_per_run, Kernel kernel) {
     for (int i = 0; i < WARMUP_RUNS; ++i)
         (void)kernel();
     std::vector<double> samples;
@@ -125,8 +121,7 @@ std::vector<double> collect(std::size_t ops_per_run, Kernel kernel) {
 double print_and_median(std::string_view label, std::vector<double> samples) {
     std::sort(samples.begin(), samples.end());
     const double med = samples[samples.size() / 2];
-    const double avg =
-        std::accumulate(samples.begin(), samples.end(), 0.0) / samples.size();
+    const double avg = std::accumulate(samples.begin(), samples.end(), 0.0) / samples.size();
     double sq = 0.0;
     for (double x : samples)
         sq += (x - avg) * (x - avg);
@@ -151,7 +146,9 @@ LogfFn resolve_libm_logf() {
     return reinterpret_cast<LogfFn>(p);
 }
 #else
-LogfFn resolve_libm_logf() { return nullptr; }
+LogfFn resolve_libm_logf() {
+    return nullptr;
+}
 #endif
 
 } // namespace perftest
@@ -175,37 +172,30 @@ int main() {
         return 1;
     }
 
-    std::cout << std::format(
-        "Performance test: libm logf vs custom logf vs vector logf8_avx2\n"
-        "iters={}, warmup_runs={}, measure_runs={}, scalar_lanes={}, "
-        "vector_lanes={}\n\n",
-        ITERS, WARMUP_RUNS, MEASURE_RUNS, SCALAR_LANES, VECTOR_LANES);
+    std::cout << std::format("Performance test: libm logf vs custom logf vs vector logf8_avx2\n"
+                             "iters={}, warmup_runs={}, measure_runs={}, scalar_lanes={}, "
+                             "vector_lanes={}\n\n",
+                             ITERS, WARMUP_RUNS, MEASURE_RUNS, SCALAR_LANES, VECTOR_LANES);
 
-    const double ml = print_and_median(
-        "Libm logf latency (CPE)", collect(ITERS, [&] {
-            return bench_scalar<1>(ITERS, libm_logf);
-        }));
-    const double mt = print_and_median(
-        "Libm logf throughput (CPE)", collect(ITERS * SCALAR_LANES, [&] {
-            return bench_scalar<SCALAR_LANES>(ITERS, libm_logf);
-        }));
-    const double ul = print_and_median(
-        "Custom logf latency (CPE)", collect(ITERS, [&] {
-            return bench_scalar<1>(ITERS, ::logf);
-        }));
+    const double ml =
+        print_and_median("Libm logf latency (CPE)",
+                         collect(ITERS, [&] { return bench_scalar<1>(ITERS, libm_logf); }));
+    const double mt =
+        print_and_median("Libm logf throughput (CPE)", collect(ITERS * SCALAR_LANES, [&] {
+                             return bench_scalar<SCALAR_LANES>(ITERS, libm_logf);
+                         }));
+    const double ul =
+        print_and_median("Custom logf latency (CPE)",
+                         collect(ITERS, [&] { return bench_scalar<1>(ITERS, ::logf); }));
     const double ut = print_and_median(
-        "Custom logf throughput (CPE)", collect(ITERS * SCALAR_LANES, [&] {
-            return bench_scalar<SCALAR_LANES>(ITERS, ::logf);
-        }));
-    const double vl = print_and_median(
-        "Vector logf8_avx2 latency (CPE)", collect(ITERS * VEC_WIDTH, [&] {
-            return bench_vector<1>(ITERS);
-        }));
-    const double vt = print_and_median(
-        "Vector logf8_avx2 throughput (CPE)",
-        collect(ITERS * VECTOR_LANES * VEC_WIDTH, [&] {
-            return bench_vector<VECTOR_LANES>(ITERS);
-        }));
+        "Custom logf throughput (CPE)",
+        collect(ITERS * SCALAR_LANES, [&] { return bench_scalar<SCALAR_LANES>(ITERS, ::logf); }));
+    const double vl =
+        print_and_median("Vector logf8_avx2 latency (CPE)",
+                         collect(ITERS * VEC_WIDTH, [&] { return bench_vector<1>(ITERS); }));
+    const double vt = print_and_median("Vector logf8_avx2 throughput (CPE)",
+                                       collect(ITERS * VECTOR_LANES * VEC_WIDTH,
+                                               [&] { return bench_vector<VECTOR_LANES>(ITERS); }));
 
     std::cout << std::format(
         "Speedup vs vector (median CPE, lower is better; ratio = slower/faster):\n"

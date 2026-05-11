@@ -159,8 +159,8 @@ int main() {
 
     std::cout << std::format("checked={} bad={} max_ulp={:.4f} worst_bits=0x{:08X} "
                              "worst_x={:.9g} got={:.9g} ref={:.17g}\n",
-                             s.checked, s.bad, s.max_ulp, s.worst_bits, s.worst_x,
-                             s.worst_got, s.worst_ref);
+                             s.checked, s.bad, s.max_ulp, s.worst_bits, s.worst_x, s.worst_got,
+                             s.worst_ref);
 
     if (s.bad > 0 || s.max_ulp > MAX_ULP) {
         std::cout << "FAIL\n";

@@ -11,8 +11,7 @@ extern "C" float logf(float x);
 namespace {
 
 constexpr double MAX_ULP = 4.0;
-constexpr int FE_MASK =
-    FE_DIVBYZERO | FE_INEXACT | FE_INVALID | FE_OVERFLOW | FE_UNDERFLOW;
+constexpr int FE_MASK = FE_DIVBYZERO | FE_INEXACT | FE_INVALID | FE_OVERFLOW | FE_UNDERFLOW;
 
 double ulp_error(float got, double ref) {
     if (std::isnan(static_cast<double>(got)) && std::isnan(ref))
@@ -67,8 +66,7 @@ bool check_interval(uint32_t lo, uint32_t hi, int n) {
         return false;
     const uint64_t span = static_cast<uint64_t>(hi) - lo;
     for (int i = 0; i < n; ++i) {
-        const uint32_t u =
-            lo + static_cast<uint32_t>((span * static_cast<uint64_t>(i)) / (n - 1));
+        const uint32_t u = lo + static_cast<uint32_t>((span * static_cast<uint64_t>(i)) / (n - 1));
         const float x = std::bit_cast<float>(u);
         if (!(x > 0.f) || !std::isfinite(x))
             continue;

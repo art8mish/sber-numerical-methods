@@ -174,8 +174,9 @@ int main() {
         measure_cpe(ITERS, WARMUP_RUNS, MEASURE_RUNS, false, THROUGHPUT_LANES, f);
 
     std::cout << "Performance test\n";
-    std::cout << "iters=" << ITERS << ", warmup_runs=" << WARMUP_RUNS << ", measure_runs=" << MEASURE_RUNS
-              << ", throughput_lanes=" << THROUGHPUT_LANES << "\n\n";
+    std::cout << "iters=" << ITERS << ", warmup_runs=" << WARMUP_RUNS
+              << ", measure_runs=" << MEASURE_RUNS << ", throughput_lanes=" << THROUGHPUT_LANES
+              << "\n\n";
 
     print_stats("Latency (CPE)", latency_samples);
     std::cout << "\n";

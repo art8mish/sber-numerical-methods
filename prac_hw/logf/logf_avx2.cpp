@@ -34,7 +34,8 @@ inline __m256d log8_half_pd(__m256d rd, __m128i e32_half) {
 __m256 logf8_avx2(__m256 x) {
     const __m256i ix = _mm256_castps_si256(x);
 
-    const __m256i biased = _mm256_srli_epi32(_mm256_and_si256(ix, _mm256_set1_epi32(0x7FFFFFFF)), 23);
+    const __m256i biased =
+        _mm256_srli_epi32(_mm256_and_si256(ix, _mm256_set1_epi32(0x7FFFFFFF)), 23);
     __m256i e = _mm256_sub_epi32(biased, _mm256_set1_epi32(127));
     const __m256i mx = _mm256_or_si256(_mm256_set1_epi32(0x00800000),
                                        _mm256_and_si256(ix, _mm256_set1_epi32(0x007FFFFF)));
