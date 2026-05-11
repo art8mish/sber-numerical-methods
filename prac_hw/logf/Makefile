@@ -1,46 +1,37 @@
-
 CXX = g++
 CXXFLAGS = -Wall -Wextra -std=c++20 -O2
-AVX2FLAGS = -mavx2 -mfma
-
-TARGET = logf.o
-SOURCES = logf.cpp
-
-AVX2_OBJ = logf_avx2.o
-AVX2_SRC = logf_avx2.cpp
-
-TEST_SRC = test_logf.cpp
-TEST_BIN = test_logf
-
-TEST_AVX2_SRC = test_logf_avx2.cpp
-TEST_AVX2_BIN = test_logf_avx2
-
+PERFFLAGS = -O3 -march=native -Wall -Wextra -std=c++20
 TESTFLAGS = -fno-builtin-log -fno-builtin-logf
+LDLIBS = -lm
 
+logf_avx2.o: CXXFLAGS += -mavx2 -mfma
 
-all: $(TARGET) $(AVX2_OBJ)
+all: logf.o logf_avx2.o
 
-$(TARGET): $(SOURCES)
-	$(CXX) $(CXXFLAGS) -c -o $(TARGET) $(SOURCES)
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-$(AVX2_OBJ): $(AVX2_SRC)
-	$(CXX) $(CXXFLAGS) $(AVX2FLAGS) -c -o $(AVX2_OBJ) $(AVX2_SRC)
+test_logf: test_logf.cpp logf.o
+	$(CXX) $(CXXFLAGS) $(TESTFLAGS) -o $@ $^ $(LDLIBS)
 
-$(TEST_BIN): $(TARGET) $(TEST_SRC)
-	$(CXX) $(CXXFLAGS) $(TESTFLAGS) -o $(TEST_BIN) $(TEST_SRC) $(TARGET) -lm
+test_logf_avx2: test_logf_avx2.cpp logf_avx2.o
+	$(CXX) $(CXXFLAGS) $(TESTFLAGS) -o $@ $^ $(LDLIBS)
 
-$(TEST_AVX2_BIN): $(AVX2_OBJ) $(TEST_AVX2_SRC)
-	$(CXX) $(CXXFLAGS) $(TESTFLAGS) -o $(TEST_AVX2_BIN) $(TEST_AVX2_SRC) $(AVX2_OBJ) -lm
+perftest: perftest.cpp logf.o logf_avx2.o
+	$(CXX) $(PERFFLAGS) $(TESTFLAGS) -o $@ $^ $(LDLIBS) -lpthread -ldl
 
-test: $(TEST_BIN)
-	./$(TEST_BIN)
+test: test_logf
+	./$<
 
-test_avx2: $(TEST_AVX2_BIN)
-	./$(TEST_AVX2_BIN)
+test_avx2: test_logf_avx2
+	./$<
+
+perf: perftest
+	./$<
 
 check: test test_avx2
 
 clean:
-	rm -f $(TARGET) $(AVX2_OBJ) $(TEST_BIN) $(TEST_AVX2_BIN)
+	rm -f logf.o logf_avx2.o test_logf test_logf_avx2 perftest
 
-.PHONY: all clean check test test_avx2
+.PHONY: all clean check test test_avx2 perf

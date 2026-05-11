@@ -1,10 +1,9 @@
-
 #include <bit>
 #include <cerrno>
 #include <cfenv>
 #include <cmath>
 #include <cstdint>
-#include <cstdio>
+#include <iostream>
 #include <limits>
 
 extern "C" float logf(float x);
@@ -12,164 +11,123 @@ extern "C" float logf(float x);
 namespace {
 
 constexpr double MAX_ULP = 4.0;
+constexpr int FE_MASK =
+    FE_DIVBYZERO | FE_INEXACT | FE_INVALID | FE_OVERFLOW | FE_UNDERFLOW;
 
 double ulp_error(float got, double ref) {
-    if (std::isnan(static_cast<double>(got)) && std::isnan(ref)) {
+    if (std::isnan(static_cast<double>(got)) && std::isnan(ref))
         return 0.0;
-    }
     const float rf = static_cast<float>(ref);
     const float n = std::nextafterf(rf, rf + 1e30f * (rf >= 0.f ? 1.f : -1.f));
     const double spacing = std::fabs(static_cast<double>(n) - static_cast<double>(rf));
-    if (spacing == 0.0) {
-        return 0.0;
-    }
-    return std::fabs(static_cast<double>(got) - ref) / spacing;
+    return spacing == 0.0 ? 0.0 : std::fabs(static_cast<double>(got) - ref) / spacing;
 }
 
-struct LibmRef {
+struct Probe {
     double value;
-    int errno_after;
-    int fe_after;
+    int err;
+    int fe;
 };
 
-LibmRef reference_log(double x) {
-    LibmRef r;
-    feclearexcept(FE_ALL_EXCEPT);
-    errno = 0;
-    volatile double xv = x;
-    r.value = std::log(xv);
-    r.errno_after = errno;
-    r.fe_after = fetestexcept(FE_ALL_EXCEPT);
-    return r;
-}
-
-bool same_fe_mask(int a, int b) {
-    const int mask = FE_DIVBYZERO | FE_INEXACT | FE_INVALID | FE_OVERFLOW | FE_UNDERFLOW;
-    return (a & mask) == (b & mask);
-}
-
-bool test_special(float x) {
-    LibmRef ref = reference_log(static_cast<double>(x));
+Probe probe_logf(float x) {
     feclearexcept(FE_ALL_EXCEPT);
     errno = 0;
     volatile float xv = x;
-    float y = logf(xv);
-    if (ref.errno_after != errno) {
-        return false;
-    }
-    if (!same_fe_mask(ref.fe_after, fetestexcept(FE_ALL_EXCEPT))) {
-        return false;
-    }
-    if (std::isnan(static_cast<double>(y)) && std::isnan(ref.value)) {
-        return true;
-    }
-    if (y == static_cast<float>(ref.value)) {
-        return true;
-    }
-    return ulp_error(y, ref.value) <= MAX_ULP;
+    const float y = logf(xv);
+    return {static_cast<double>(y), errno, fetestexcept(FE_ALL_EXCEPT)};
 }
 
-bool test_point_bits(uint32_t bits) {
-    const float x = std::bit_cast<float>(bits);
-    LibmRef ref = reference_log(static_cast<double>(x));
+Probe probe_ref(double x) {
     feclearexcept(FE_ALL_EXCEPT);
     errno = 0;
-    const float y = logf(x);
-    if (ref.errno_after != errno) {
-        return false;
-    }
-    if (!same_fe_mask(ref.fe_after, fetestexcept(FE_ALL_EXCEPT))) {
-        return false;
-    }
-    if (std::isnan(static_cast<double>(y)) && std::isnan(ref.value)) {
-        return true;
-    }
-    return ulp_error(y, ref.value) <= MAX_ULP;
+    volatile double xv = x;
+    return {std::log(xv), errno, fetestexcept(FE_ALL_EXCEPT)};
 }
 
-bool test_interval(uint32_t lo, uint32_t hi, int n) {
-    if (lo > hi || n < 2) {
+// Особые точки: errno и FE-маска должны совпадать с libm, плюс ULP <= MAX_ULP.
+bool check_libm_match(uint32_t bits) {
+    const float x = std::bit_cast<float>(bits);
+    const Probe ref = probe_ref(static_cast<double>(x));
+    const Probe got = probe_logf(x);
+    if (got.err != ref.err)
         return false;
-    }
-    const uint64_t span = static_cast<uint64_t>(hi) - static_cast<uint64_t>(lo);
+    if ((got.fe & FE_MASK) != (ref.fe & FE_MASK))
+        return false;
+    if (std::isnan(got.value) && std::isnan(ref.value))
+        return true;
+    const float gotf = static_cast<float>(got.value);
+    if (gotf == static_cast<float>(ref.value))
+        return true;
+    return ulp_error(gotf, ref.value) <= MAX_ULP;
+}
+
+// Прогон по интервалу битов: только errno == 0 и ULP <= MAX_ULP.
+bool check_interval(uint32_t lo, uint32_t hi, int n) {
+    if (lo > hi || n < 2)
+        return false;
+    const uint64_t span = static_cast<uint64_t>(hi) - lo;
     for (int i = 0; i < n; ++i) {
-        const uint32_t u = lo + static_cast<uint32_t>((span * static_cast<uint64_t>(i)) /
-                                                      static_cast<uint64_t>(n - 1));
+        const uint32_t u =
+            lo + static_cast<uint32_t>((span * static_cast<uint64_t>(i)) / (n - 1));
         const float x = std::bit_cast<float>(u);
-        if (!(x > 0.f) || !std::isfinite(x)) {
+        if (!(x > 0.f) || !std::isfinite(x))
             continue;
-        }
-        LibmRef ref = reference_log(static_cast<double>(x));
-        feclearexcept(FE_ALL_EXCEPT);
-        errno = 0;
-        const float y = logf(x);
-        (void)y;
-        if (errno != 0) {
+        const Probe got = probe_logf(x);
+        if (got.err != 0)
             return false;
-        }
-        if (ulp_error(y, ref.value) > MAX_ULP) {
+        const double ref = std::log(static_cast<double>(x));
+        if (ulp_error(static_cast<float>(got.value), ref) > MAX_ULP)
             return false;
-        }
     }
     return true;
+}
+
+void fail(const char *what) {
+    std::cerr << "FAIL: " << what << "\n";
 }
 
 } // namespace
 
 int main() {
-    const float specials[] = {
-        0.f,
-        std::copysign(0.f, -1.f),
-        -1.f,
-        std::numeric_limits<float>::infinity(),
-        std::numeric_limits<float>::quiet_NaN(),
-    };
-    for (float x : specials) {
-        if (!test_special(x)) {
-            std::fputs("FAIL: special\n", stderr);
-            return 1;
-        }
-    }
-
-    const uint32_t explicit_points[] = {
-        0x3F7FFFFFu, // closest float < 1.0
-        0xBF800000u, // -1.0
+    constexpr uint32_t specials[] = {
+        0x00000000u, // +0
+        0x80000000u, // -0
+        0xBF800000u, // -1
+        0x7F800000u, // +inf
         0xFF800000u, // -inf
-        0x80000001u, // negative smallest subnormal
-        0x807FFFFFu, // negative largest subnormal
+        0x7FC00000u, // qNaN
+        0x3F7FFFFFu, // closest float < 1.0
+        0x80000001u, // smallest negative subnormal
+        0x807FFFFFu, // largest negative subnormal
     };
-    for (uint32_t u : explicit_points) {
-        if (!test_point_bits(u)) {
-            std::fputs("FAIL: explicit point\n", stderr);
+    for (uint32_t u : specials) {
+        if (!check_libm_match(u)) {
+            fail("special");
             return 1;
         }
     }
 
-    if (!test_interval(0x3F700000u, 0x3F8FFFFFu, 20000)) {
-        std::fputs("FAIL: interval near one\n", stderr);
+    if (!check_interval(0x3F700000u, 0x3F8FFFFFu, 20000)) {
+        fail("interval near one");
+        return 1;
+    }
+    if (!check_interval(1u, 0x007FFFFFu, 1000)) {
+        fail("interval subnormal");
         return 1;
     }
 
-    const int pts = 1000;
-    if (!test_interval(1u, 0x007FFFFFu, pts)) {
-        std::fputs("FAIL: interval subnormal\n", stderr);
-        return 1;
-    }
-    const uint32_t fin_lo = 0x00800000u;
-    const uint32_t fin_hi = 0x7F7FFFFFu;
-    const uint64_t fspan = static_cast<uint64_t>(fin_hi - fin_lo);
-    const int nbuckets = 4;
-    for (int b = 0; b < nbuckets; ++b) {
-        const uint32_t blo = fin_lo + static_cast<uint32_t>((fspan * static_cast<uint64_t>(b)) /
-                                                            static_cast<uint64_t>(nbuckets));
-        const uint32_t bhi = fin_lo + static_cast<uint32_t>((fspan * static_cast<uint64_t>(b + 1)) /
-                                                            static_cast<uint64_t>(nbuckets));
-        if (!test_interval(blo, bhi, pts)) {
-            std::fputs("FAIL: interval normal\n", stderr);
+    constexpr uint32_t fin_lo = 0x00800000u;
+    constexpr uint32_t fin_hi = 0x7F7FFFFFu;
+    constexpr uint64_t fspan = fin_hi - fin_lo;
+    for (int b = 0; b < 4; ++b) {
+        const uint32_t blo = fin_lo + static_cast<uint32_t>((fspan * b) / 4);
+        const uint32_t bhi = fin_lo + static_cast<uint32_t>((fspan * (b + 1)) / 4);
+        if (!check_interval(blo, bhi, 1000)) {
+            fail("interval normal");
             return 1;
         }
     }
 
-    std::puts("PASS");
+    std::cout << "PASS\n";
     return 0;
 }

@@ -1,3 +1,5 @@
+// Тест logf8_avx2: собирается без -mavx2 (см. Makefile), AVX2-путь обёрнут
+// в __attribute__((target("avx2,fma"))) и вызывается только после CPUID-проверки.
 
 #include <bit>
 #include <cmath>
@@ -6,27 +8,25 @@
 #include <immintrin.h>
 #include <iostream>
 #include <limits>
+#include <span>
 
 __m256 logf8_avx2(__m256 x);
 
 namespace {
 
 constexpr double MAX_ULP = 4.0;
+constexpr int VEC_W = 8;
 
 double ulp_error(float got, double ref) {
     const float rf = static_cast<float>(ref);
     const float n = std::nextafterf(rf, rf + 1e30f * (rf >= 0.f ? 1.f : -1.f));
     const double spacing = std::fabs(static_cast<double>(n) - static_cast<double>(rf));
-    if (spacing == 0.0) {
-        return 0.0;
-    }
-    return std::fabs(static_cast<double>(got) - ref) / spacing;
+    return spacing == 0.0 ? 0.0 : std::fabs(static_cast<double>(got) - ref) / spacing;
 }
 
-__attribute__((target("avx2,fma"))) void call_logf8(const float *in, float *out) {
-    __m256 v = _mm256_loadu_ps(in);
-    __m256 r = logf8_avx2(v);
-    _mm256_storeu_ps(out, r);
+bool valid_normalized(uint32_t u) {
+    const uint32_t biased = (u >> 23) & 0xFFu;
+    return biased >= 1u && biased <= 254u && (u & 0x80000000u) == 0u;
 }
 
 struct Stats {
@@ -39,87 +39,75 @@ struct Stats {
     double worst_ref = 0.0;
 };
 
-void update_stats(Stats &s, float x, uint32_t bits, float got) {
-    const double ref = std::log(static_cast<double>(x));
-    const double e = ulp_error(got, ref);
-    if (e > s.max_ulp) {
-        s.max_ulp = e;
-        s.worst_bits = bits;
-        s.worst_x = x;
-        s.worst_got = got;
-        s.worst_ref = ref;
-    }
-    if (e > MAX_ULP) {
-        ++s.bad;
-    }
-    ++s.checked;
+__attribute__((target("avx2,fma"))) void call_logf8(const float *in, float *out) {
+    _mm256_storeu_ps(out, logf8_avx2(_mm256_loadu_ps(in)));
 }
 
-void run_batch(const uint32_t bits[8], Stats &s) {
-    alignas(32) float in[8];
-    alignas(32) float out[8];
-    for (int i = 0; i < 8; ++i) {
-        in[i] = std::bit_cast<float>(bits[i]);
-    }
-    call_logf8(in, out);
-    for (int i = 0; i < 8; ++i) {
-        update_stats(s, in[i], bits[i], out[i]);
-    }
-}
+// Буферизует валидные точки до батча в VEC_W элементов и сравнивает с std::log.
+class BatchRunner {
+public:
+    explicit BatchRunner(Stats &s) : stats_(s) {}
 
-bool valid_normalized(uint32_t u) {
-    const uint32_t biased = (u >> 23) & 0xFFu;
-    return biased >= 1u && biased <= 254u && (u & 0x80000000u) == 0u;
-}
+    void add(uint32_t bits) {
+        if (!valid_normalized(bits))
+            return;
+        buf_[k_++] = bits;
+        last_ = bits;
+        if (k_ == VEC_W)
+            flush_full();
+    }
 
-void test_interval(uint32_t lo, uint32_t hi, uint64_t n, Stats &s) {
-    if (lo > hi || n < 8) {
-        return;
+    void flush() {
+        if (k_ == 0)
+            return;
+        for (int j = k_; j < VEC_W; ++j)
+            buf_[j] = last_;
+        flush_full();
     }
-    const uint64_t span = static_cast<uint64_t>(hi) - static_cast<uint64_t>(lo);
-    uint32_t batch[8];
-    int k = 0;
-    uint32_t last_valid = lo;
-    for (uint64_t i = 0; i < n; ++i) {
-        const uint32_t u = lo + static_cast<uint32_t>((span * i) / (n - 1));
-        if (!valid_normalized(u)) {
-            continue;
-        }
-        last_valid = u;
-        batch[k++] = u;
-        if (k == 8) {
-            run_batch(batch, s);
-            k = 0;
-        }
-    }
-    if (k > 0) {
-        for (int j = k; j < 8; ++j) {
-            batch[j] = last_valid;
-        }
-        run_batch(batch, s);
-    }
-}
 
-void test_explicit(const float *xs, int n, Stats &s) {
-    int i = 0;
-    while (i < n) {
-        uint32_t batch[8];
-        int k = 0;
-        while (k < 8 && i < n) {
-            const uint32_t u = std::bit_cast<uint32_t>(xs[i++]);
-            if (!valid_normalized(u)) {
-                continue;
+private:
+    void flush_full() {
+        alignas(32) float in[VEC_W];
+        alignas(32) float out[VEC_W];
+        for (int i = 0; i < VEC_W; ++i)
+            in[i] = std::bit_cast<float>(buf_[i]);
+        call_logf8(in, out);
+        for (int i = 0; i < VEC_W; ++i) {
+            const float x = in[i];
+            const float y = out[i];
+            const double ref = std::log(static_cast<double>(x));
+            const double e = ulp_error(y, ref);
+            if (e > stats_.max_ulp) {
+                stats_.max_ulp = e;
+                stats_.worst_bits = buf_[i];
+                stats_.worst_x = x;
+                stats_.worst_got = y;
+                stats_.worst_ref = ref;
             }
-            batch[k++] = u;
+            if (e > MAX_ULP)
+                ++stats_.bad;
+            ++stats_.checked;
         }
-        if (k == 0) {
-            break;
-        }
-        for (int j = k; j < 8; ++j) {
-            batch[j] = batch[0];
-        }
-        run_batch(batch, s);
+        k_ = 0;
     }
+
+    Stats &stats_;
+    uint32_t buf_[VEC_W]{};
+    uint32_t last_ = 0;
+    int k_ = 0;
+};
+
+void sweep_interval(BatchRunner &r, uint32_t lo, uint32_t hi, uint64_t n) {
+    if (lo > hi || n < 2)
+        return;
+    const uint64_t span = static_cast<uint64_t>(hi) - lo;
+    for (uint64_t i = 0; i < n; ++i)
+        r.add(lo + static_cast<uint32_t>((span * i) / (n - 1)));
+}
+
+void sweep_points(BatchRunner &r, std::span<const float> xs) {
+    for (float x : xs)
+        r.add(std::bit_cast<uint32_t>(x));
 }
 
 } // namespace
@@ -131,8 +119,9 @@ int main() {
     }
 
     Stats s;
+    BatchRunner r{s};
 
-    const float interesting[] = {
+    static const float interesting[] = {
         1.0f,
         std::nextafterf(1.0f, 2.0f),
         std::nextafterf(1.0f, 0.0f),
@@ -150,23 +139,23 @@ int main() {
         std::numeric_limits<float>::min(),
         std::numeric_limits<float>::max(),
     };
-    test_explicit(interesting, static_cast<int>(sizeof(interesting) / sizeof(interesting[0])), s);
+    sweep_points(r, interesting);
 
-    test_interval(0x3F700000u, 0x3F8FFFFFu, 20000, s);
-    test_interval(0x3FB00000u, 0x3FB80000u, 5000, s);
+    sweep_interval(r, 0x3F700000u, 0x3F8FFFFFu, 20000);
+    sweep_interval(r, 0x3FB00000u, 0x3FB80000u, 5000);
 
-    const uint32_t fin_lo = 0x00800000u;
-    const uint32_t fin_hi = 0x7F7FFFFFu;
-    const uint64_t fspan = static_cast<uint64_t>(fin_hi - fin_lo);
-    const int nbuckets = 4;
-    const uint64_t pts_per = 5000;
+    constexpr uint32_t fin_lo = 0x00800000u;
+    constexpr uint32_t fin_hi = 0x7F7FFFFFu;
+    constexpr uint64_t fspan = fin_hi - fin_lo;
+    constexpr int nbuckets = 4;
+    constexpr uint64_t pts_per = 5000;
     for (int b = 0; b < nbuckets; ++b) {
-        const uint32_t blo =
-            fin_lo + static_cast<uint32_t>((fspan * static_cast<uint64_t>(b)) / nbuckets);
-        const uint32_t bhi =
-            fin_lo + static_cast<uint32_t>((fspan * static_cast<uint64_t>(b + 1)) / nbuckets);
-        test_interval(blo, bhi, pts_per, s);
+        const uint32_t blo = fin_lo + static_cast<uint32_t>((fspan * b) / nbuckets);
+        const uint32_t bhi = fin_lo + static_cast<uint32_t>((fspan * (b + 1)) / nbuckets);
+        sweep_interval(r, blo, bhi, pts_per);
     }
+
+    r.flush();
 
     std::cout << std::format("checked={} bad={} max_ulp={:.4f} worst_bits=0x{:08X} "
                              "worst_x={:.9g} got={:.9g} ref={:.17g}\n",
