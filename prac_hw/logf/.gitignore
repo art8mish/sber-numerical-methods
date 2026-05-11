@@ -1,3 +1,7 @@
 logf
 logf.o
 test_logf
+
+logf_avx2
+logf_avx2.o
+test_logf_avx2
