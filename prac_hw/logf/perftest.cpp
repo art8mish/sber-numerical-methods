@@ -118,7 +118,7 @@ template <typename Kernel> std::vector<double> collect(std::size_t ops_per_run, 
     return samples;
 }
 
-double print_and_median(std::string_view label, std::vector<double> samples) {
+double median(std::string_view label, std::vector<double> samples) {
     std::sort(samples.begin(), samples.end());
     const double med = samples[samples.size() / 2];
     const double avg = std::accumulate(samples.begin(), samples.end(), 0.0) / samples.size();
@@ -178,22 +178,22 @@ int main() {
                              ITERS, WARMUP_RUNS, MEASURE_RUNS, SCALAR_LANES, VECTOR_LANES);
 
     const double ml =
-        print_and_median("Libm logf latency (CPE)",
+        median("Libm logf latency (CPE)",
                          collect(ITERS, [&] { return bench_scalar<1>(ITERS, libm_logf); }));
     const double mt =
-        print_and_median("Libm logf throughput (CPE)", collect(ITERS * SCALAR_LANES, [&] {
+        median("Libm logf throughput (CPE)", collect(ITERS * SCALAR_LANES, [&] {
                              return bench_scalar<SCALAR_LANES>(ITERS, libm_logf);
                          }));
     const double ul =
-        print_and_median("Custom logf latency (CPE)",
+        median("Custom logf latency (CPE)",
                          collect(ITERS, [&] { return bench_scalar<1>(ITERS, ::logf); }));
-    const double ut = print_and_median(
+    const double ut = median(
         "Custom logf throughput (CPE)",
         collect(ITERS * SCALAR_LANES, [&] { return bench_scalar<SCALAR_LANES>(ITERS, ::logf); }));
     const double vl =
-        print_and_median("Vector logf8_avx2 latency (CPE)",
+        median("Vector logf8_avx2 latency (CPE)",
                          collect(ITERS * VEC_WIDTH, [&] { return bench_vector<1>(ITERS); }));
-    const double vt = print_and_median("Vector logf8_avx2 throughput (CPE)",
+    const double vt = median("Vector logf8_avx2 throughput (CPE)",
                                        collect(ITERS * VECTOR_LANES * VEC_WIDTH,
                                                [&] { return bench_vector<VECTOR_LANES>(ITERS); }));
 
