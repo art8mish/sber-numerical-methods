@@ -6,8 +6,7 @@
 
 namespace {
 
-constexpr double LN2 =
-    0.693147180559945309417232121458176568075500134360255254120680009;
+constexpr double LN2 = 0.693147180559945309417232121458176568075500134360255254120680009;
 constexpr double SQRT2 = 1.4142135623730950488016887242096980785696718753769;
 
 // ln(r), r in [1, 2): ln(r) = 2*atanh(u), u = (r-1)/(r+1), u in [0, 1/3].
@@ -29,13 +28,13 @@ double log_mantissa(double r) {
     return 2.0 * (u * q);
 }
 
-}  // namespace
+} // namespace
 
 extern "C" float logf(float x) {
     uint32_t ix = 0u;
     std::memcpy(&ix, &x, sizeof(ix));
     // 0x7FFFFFFFu = 0111 1111 1111 1111 1111 1111 1111 1111
-    const uint32_t abs_ix = ix & 0x7FFFFFFFu; 
+    const uint32_t abs_ix = ix & 0x7FFFFFFFu;
 
     // log(0)=-INF,
     if (abs_ix == 0u) {
@@ -44,7 +43,7 @@ extern "C" float logf(float x) {
         return -std::numeric_limits<float>::infinity();
     }
 
-    // log(negative)=NaN 
+    // log(negative)=NaN
     // 0x7FFFFFFFu = 0111 1111 1111 1111 1111 1111 1111 1111
     if (ix > 0x7FFFFFFFu) {
         errno = EDOM;
@@ -53,7 +52,7 @@ extern "C" float logf(float x) {
     }
 
     // 0x7F800000u = 0111 1111 1000 0000 0000 0000 0000 0000
-    if (abs_ix >= 0x7F800000u) { 
+    if (abs_ix >= 0x7F800000u) {
         return x; // (abs_ix == 0x7F800000u) ? +INF : NaN
     }
 
@@ -75,7 +74,7 @@ extern "C" float logf(float x) {
     }
 
     // 0x3F800000u = 0011 1111 1000 0000 0000 0000 0000 0000 (1.0)
-    // 0x007FFFFFu = 0000 0000 0111 1111 1111 1111 1111 1111 
+    // 0x007FFFFFu = 0000 0000 0111 1111 1111 1111 1111 1111
     const uint32_t rbits = 0x3F800000u | (mx & 0x007FFFFFu);
     float rf = 0.0f;
     std::memcpy(&rf, &rbits, sizeof(rf));

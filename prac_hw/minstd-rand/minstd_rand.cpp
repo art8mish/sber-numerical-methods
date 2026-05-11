@@ -88,14 +88,14 @@ std::vector<uint32_t> make_lane_powers() {
     return p;
 }
 
-void gen_uniform01_scalar(float* out, size_t n, uint32_t seed) {
+void gen_uniform01_scalar(float *out, size_t n, uint32_t seed) {
     MinStdRand gen(seed);
     for (size_t i = 0; i < n; ++i) {
         out[i] = to_uniform01_fp32(gen.next());
     }
 }
 
-void gen_uniform01_vector(float* out, size_t n, uint32_t seed) {
+void gen_uniform01_vector(float *out, size_t n, uint32_t seed) {
     uint32_t state = normalize_seed(seed);
     const std::vector<uint32_t> p = make_lane_powers();
     const uint32_t step = p[LANES - 1]; // A^8
@@ -111,7 +111,7 @@ void gen_uniform01_vector(float* out, size_t n, uint32_t seed) {
         }
         state = mul_mod(step, base);
 
-        const __m256i vi = _mm256_load_si256(reinterpret_cast<const __m256i*>(xs));
+        const __m256i vi = _mm256_load_si256(reinterpret_cast<const __m256i *>(xs));
         const __m256 vf = _mm256_mul_ps(_mm256_cvtepi32_ps(vi), invm);
         _mm256_storeu_ps(out + i, vf);
     }
@@ -142,14 +142,15 @@ bool verify_vector_matches_scalar(uint32_t seed, size_t n) {
     gen_uniform01_vector(b.data(), n, seed);
     for (size_t i = 0; i < n; ++i) {
         if (a[i] != b[i]) {
-            std::cerr << "Vector/scalar mismatch at " << i << ": " << b[i] << " vs " << a[i] << "\n";
+            std::cerr << "Vector/scalar mismatch at " << i << ": " << b[i] << " vs " << a[i]
+                      << "\n";
             return false;
         }
     }
     return true;
 }
 
-uint64_t estimate_pi_hits(MinStdRand& gen, size_t n_vectors) {
+uint64_t estimate_pi_hits(MinStdRand &gen, size_t n_vectors) {
     uint64_t hits = 0;
     for (size_t i = 0; i < n_vectors; ++i) {
         const double u1 = to_uniform_pm1(gen.next());
@@ -208,8 +209,7 @@ struct RunStats {
 };
 
 #if defined(__x86_64__) || defined(__i386__)
-template <typename Func>
-uint64_t benchmark_cycles(Func&& f) {
+template <typename Func> uint64_t benchmark_cycles(Func &&f) {
     const uint64_t t1 = read_tsc_start();
     f();
     const uint64_t t2 = read_tsc_end();
@@ -220,13 +220,15 @@ uint64_t benchmark_cycles(Func&& f) {
 void print_generator_bench(size_t n, uint32_t seed) {
     std::vector<float> buf(n);
 #if defined(__x86_64__) || defined(__i386__)
-    const uint64_t scalar_cycles = benchmark_cycles([&]() { gen_uniform01_scalar(buf.data(), n, seed); });
-    const uint64_t vector_cycles = benchmark_cycles([&]() { gen_uniform01_vector(buf.data(), n, seed); });
+    const uint64_t scalar_cycles =
+        benchmark_cycles([&]() { gen_uniform01_scalar(buf.data(), n, seed); });
+    const uint64_t vector_cycles =
+        benchmark_cycles([&]() { gen_uniform01_vector(buf.data(), n, seed); });
     const double scalar_cpe = static_cast<double>(scalar_cycles) / static_cast<double>(n);
     const double vector_cpe = static_cast<double>(vector_cycles) / static_cast<double>(n);
-    const double speedup_sv = vector_cycles > 0
-                                  ? static_cast<double>(scalar_cycles) / static_cast<double>(vector_cycles)
-                                  : 0.0;
+    const double speedup_sv =
+        vector_cycles > 0 ? static_cast<double>(scalar_cycles) / static_cast<double>(vector_cycles)
+                          : 0.0;
 
     std::cout << "\nGenerator clocks/element (N=2^24)\n";
     std::cout << "scalar_cpe=" << scalar_cpe << " (cycles=" << scalar_cycles << ")\n";
@@ -265,24 +267,28 @@ int main() {
 
     MinStdRand scalar_gen(DEFAULT_SEED);
 #if defined(__x86_64__) || defined(__i386__)
-    scalar_cycles = benchmark_cycles([&]() { scalar_hits = estimate_pi_hits(scalar_gen, PI_VECTORS); });
-    parallel_cycles =
-        benchmark_cycles([&]() { parallel_hits = estimate_pi_hits_parallel(PI_VECTORS, DEFAULT_SEED); });
+    scalar_cycles =
+        benchmark_cycles([&]() { scalar_hits = estimate_pi_hits(scalar_gen, PI_VECTORS); });
+    parallel_cycles = benchmark_cycles(
+        [&]() { parallel_hits = estimate_pi_hits_parallel(PI_VECTORS, DEFAULT_SEED); });
 #else
     scalar_hits = estimate_pi_hits(scalar_gen, PI_VECTORS);
     parallel_hits = estimate_pi_hits_parallel(PI_VECTORS, DEFAULT_SEED);
 #endif
-    const double scalar_pi = 4.0 * static_cast<double>(scalar_hits) / static_cast<double>(PI_VECTORS);
-    const double parallel_pi = 4.0 * static_cast<double>(parallel_hits) / static_cast<double>(PI_VECTORS);
+    const double scalar_pi =
+        4.0 * static_cast<double>(scalar_hits) / static_cast<double>(PI_VECTORS);
+    const double parallel_pi =
+        4.0 * static_cast<double>(parallel_hits) / static_cast<double>(PI_VECTORS);
 
-    const double speedup = parallel_cycles > 0
-                               ? static_cast<double>(scalar_cycles) / static_cast<double>(parallel_cycles)
-                               : 0.0;
+    const double speedup = parallel_cycles > 0 ? static_cast<double>(scalar_cycles) /
+                                                     static_cast<double>(parallel_cycles)
+                                               : 0.0;
 
     std::cout << "\nMonte Carlo benchmark results:\n";
     std::cout << "Case      | hits      | pi       | cycles\n";
     std::cout << "-----------------------------------------------\n";
-    std::cout << "scalar    | " << scalar_hits << " | " << scalar_pi << " | " << scalar_cycles << "\n";
+    std::cout << "scalar    | " << scalar_hits << " | " << scalar_pi << " | " << scalar_cycles
+              << "\n";
     std::cout << "parallel  | " << parallel_hits << " | " << parallel_pi << " | " << parallel_cycles
               << "\n";
 
@@ -292,7 +298,8 @@ int main() {
 #if defined(HAS_AVX2)
     std::cout << "Vectorization note: AVX2 is enabled for fp32 conversion/store path.\n";
 #else
-    std::cout << "Vectorization note: AVX2 unavailable, vector path falls back to scalar operations.\n";
+    std::cout
+        << "Vectorization note: AVX2 unavailable, vector path falls back to scalar operations.\n";
 #endif
     return 0;
 }

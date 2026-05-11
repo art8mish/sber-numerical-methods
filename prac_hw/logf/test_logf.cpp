@@ -1,7 +1,7 @@
 
+#include <bit>
 #include <cerrno>
 #include <cfenv>
-#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -18,10 +18,8 @@ double ulp_error(float got, double ref) {
         return 0.0;
     }
     const float rf = static_cast<float>(ref);
-    const float n =
-        std::nextafterf(rf, rf + 1e30f * (rf >= 0.f ? 1.f : -1.f));
-    const double spacing =
-        std::fabs(static_cast<double>(n) - static_cast<double>(rf));
+    const float n = std::nextafterf(rf, rf + 1e30f * (rf >= 0.f ? 1.f : -1.f));
+    const double spacing = std::fabs(static_cast<double>(n) - static_cast<double>(rf));
     if (spacing == 0.0) {
         return 0.0;
     }
@@ -46,8 +44,7 @@ LibmRef reference_log(double x) {
 }
 
 bool same_fe_mask(int a, int b) {
-    const int mask = FE_DIVBYZERO | FE_INEXACT | FE_INVALID | FE_OVERFLOW |
-                     FE_UNDERFLOW;
+    const int mask = FE_DIVBYZERO | FE_INEXACT | FE_INVALID | FE_OVERFLOW | FE_UNDERFLOW;
     return (a & mask) == (b & mask);
 }
 
@@ -96,9 +93,8 @@ bool test_interval(uint32_t lo, uint32_t hi, int n) {
     }
     const uint64_t span = static_cast<uint64_t>(hi) - static_cast<uint64_t>(lo);
     for (int i = 0; i < n; ++i) {
-        const uint32_t u =
-            lo + static_cast<uint32_t>((span * static_cast<uint64_t>(i)) /
-                                       static_cast<uint64_t>(n - 1));
+        const uint32_t u = lo + static_cast<uint32_t>((span * static_cast<uint64_t>(i)) /
+                                                      static_cast<uint64_t>(n - 1));
         const float x = std::bit_cast<float>(u);
         if (!(x > 0.f) || !std::isfinite(x)) {
             continue;
@@ -118,7 +114,7 @@ bool test_interval(uint32_t lo, uint32_t hi, int n) {
     return true;
 }
 
-}  // namespace
+} // namespace
 
 int main() {
     const float specials[] = {
@@ -136,11 +132,11 @@ int main() {
     }
 
     const uint32_t explicit_points[] = {
-        0x3F7FFFFFu,  // closest float < 1.0
-        0xBF800000u,  // -1.0
-        0xFF800000u,  // -inf
-        0x80000001u,  // negative smallest subnormal
-        0x807FFFFFu,  // negative largest subnormal
+        0x3F7FFFFFu, // closest float < 1.0
+        0xBF800000u, // -1.0
+        0xFF800000u, // -inf
+        0x80000001u, // negative smallest subnormal
+        0x807FFFFFu, // negative largest subnormal
     };
     for (uint32_t u : explicit_points) {
         if (!test_point_bits(u)) {
@@ -164,12 +160,10 @@ int main() {
     const uint64_t fspan = static_cast<uint64_t>(fin_hi - fin_lo);
     const int nbuckets = 4;
     for (int b = 0; b < nbuckets; ++b) {
-        const uint32_t blo =
-            fin_lo + static_cast<uint32_t>((fspan * static_cast<uint64_t>(b)) /
-                                           static_cast<uint64_t>(nbuckets));
-        const uint32_t bhi =
-            fin_lo + static_cast<uint32_t>((fspan * static_cast<uint64_t>(b + 1)) /
-                                           static_cast<uint64_t>(nbuckets));
+        const uint32_t blo = fin_lo + static_cast<uint32_t>((fspan * static_cast<uint64_t>(b)) /
+                                                            static_cast<uint64_t>(nbuckets));
+        const uint32_t bhi = fin_lo + static_cast<uint32_t>((fspan * static_cast<uint64_t>(b + 1)) /
+                                                            static_cast<uint64_t>(nbuckets));
         if (!test_interval(blo, bhi, pts)) {
             std::fputs("FAIL: interval normal\n", stderr);
             return 1;

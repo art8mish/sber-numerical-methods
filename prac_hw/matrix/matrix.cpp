@@ -29,13 +29,13 @@ Matrix random_matrix(size_t rows, size_t cols, unsigned seed) {
     std::mt19937 gen(seed);
     std::uniform_real_distribution<Value> dist(-1.0f, 1.0f);
     Matrix m(rows * cols);
-    for (Value& v : m) {
+    for (Value &v : m) {
         v = dist(gen);
     }
     return m;
 }
 
-void matmul_naive(const Matrix& a, const Matrix& b, Matrix& c, size_t m, size_t k, size_t n) {
+void matmul_naive(const Matrix &a, const Matrix &b, Matrix &c, size_t m, size_t k, size_t n) {
     std::fill(c.begin(), c.end(), 0.0f);
     for (size_t i = 0; i < m; ++i) {
         for (size_t j = 0; j < n; ++j) {
@@ -48,7 +48,7 @@ void matmul_naive(const Matrix& a, const Matrix& b, Matrix& c, size_t m, size_t 
     }
 }
 
-void transpose(const Matrix& src, Matrix& dst, size_t rows, size_t cols) {
+void transpose(const Matrix &src, Matrix &dst, size_t rows, size_t cols) {
     for (size_t i = 0; i < rows; ++i) {
         for (size_t j = 0; j < cols; ++j) {
             dst[idx(j, i, rows)] = src[idx(i, j, cols)];
@@ -56,7 +56,8 @@ void transpose(const Matrix& src, Matrix& dst, size_t rows, size_t cols) {
     }
 }
 
-void matmul_blocked(const Matrix& a, const Matrix& b, Matrix& c, size_t m, size_t k, size_t n, size_t block) {
+void matmul_blocked(const Matrix &a, const Matrix &b, Matrix &c, size_t m, size_t k, size_t n,
+                    size_t block) {
     std::fill(c.begin(), c.end(), 0.0f);
     for (size_t jj = 0; jj < n; jj += block) {
         for (size_t kk = 0; kk < k; kk += block) {
@@ -78,7 +79,8 @@ void matmul_blocked(const Matrix& a, const Matrix& b, Matrix& c, size_t m, size_
 }
 
 #if defined(__AVX2__) && defined(__FMA__)
-void matmul_blocked_simd(const Matrix& a, const Matrix& b, Matrix& c, size_t m, size_t k, size_t n, size_t block) {
+void matmul_blocked_simd(const Matrix &a, const Matrix &b, Matrix &c, size_t m, size_t k, size_t n,
+                         size_t block) {
     std::fill(c.begin(), c.end(), 0.0f);
     for (size_t jj = 0; jj < n; jj += block) {
         for (size_t kk = 0; kk < k; kk += block) {
@@ -170,7 +172,8 @@ void matmul_blocked_simd(const Matrix& a, const Matrix& b, Matrix& c, size_t m, 
     }
 }
 
-void matmul_blocked_simd_ipj(const Matrix& a, const Matrix& b, Matrix& c, size_t m, size_t k, size_t n, size_t block) {
+void matmul_blocked_simd_ipj(const Matrix &a, const Matrix &b, Matrix &c, size_t m, size_t k,
+                             size_t n, size_t block) {
     std::fill(c.begin(), c.end(), 0.0f);
     for (size_t jj = 0; jj < n; jj += block) {
         for (size_t kk = 0; kk < k; kk += block) {
@@ -244,7 +247,7 @@ void matmul_blocked_simd_ipj(const Matrix& a, const Matrix& b, Matrix& c, size_t
 }
 #endif
 
-Value max_abs_diff(const Matrix& x, const Matrix& y) {
+Value max_abs_diff(const Matrix &x, const Matrix &y) {
     Value diff = 0.0f;
     for (size_t i = 0; i < x.size(); ++i) {
         diff = std::max(diff, std::abs(x[i] - y[i]));
@@ -268,8 +271,7 @@ static inline uint64_t read_tsc_end() {
 }
 #endif
 
-template <typename Func>
-uint64_t benchmark_cycles(Func f, int repeat = 5) {
+template <typename Func> uint64_t benchmark_cycles(Func f, int repeat = 5) {
     uint64_t best = UINT64_MAX;
     for (int r = 0; r < repeat; ++r) {
 #if defined(__x86_64__) || defined(__i386__)
@@ -299,41 +301,50 @@ int main() {
     std::cout << "fp32 GEMM, block=" << block << "\n";
 
 #if defined(__AVX2__) && defined(__FMA__)
-    std::cout << std::setw(15) << "case" << " | " << std::setw(9) << "naive @" << " | " << std::setw(11) << "blocked @" << " | "  << std::setw(11) << "simd_ipj @" << " | " << std::setw(8) << "simd @" << " | " << std::setw(6) << "n/blk" << " | " << std::setw(9) << "n/simd_ipj"  << " | " << std::setw(7) << "n/simd" << " | " << "\n";
+    std::cout << std::setw(15) << "case" << " | " << std::setw(9) << "naive @" << " | "
+              << std::setw(11) << "blocked @" << " | " << std::setw(11) << "simd_ipj @" << " | "
+              << std::setw(8) << "simd @" << " | " << std::setw(6) << "n/blk" << " | "
+              << std::setw(9) << "n/simd_ipj" << " | " << std::setw(7) << "n/simd" << " | " << "\n";
     std::cout << std::string(105, '-') << "\n";
 
-    for (const Shape& s : shapes) {
+    for (const Shape &s : shapes) {
         Matrix a = random_matrix(s.m, s.k, 777u + static_cast<unsigned>(s.m + s.k + s.n));
         Matrix b = random_matrix(s.k, s.n, 999u + static_cast<unsigned>(s.m + s.k + s.n));
         Matrix c0(s.m * s.n), c1(s.m * s.n), c2(s.m * s.n), c3(s.m * s.n);
 
         const uint64_t t0 = benchmark_cycles([&]() { matmul_naive(a, b, c0, s.m, s.k, s.n); });
-        const uint64_t t1 = benchmark_cycles([&]() { matmul_blocked(a, b, c1, s.m, s.k, s.n, block); });
-        const uint64_t t2 = benchmark_cycles([&]() { matmul_blocked_simd(a, b, c2, s.m, s.k, s.n, block); });
-        const uint64_t t3 = benchmark_cycles([&]() { matmul_blocked_simd_ipj(a, b, c3, s.m, s.k, s.n, block); });
+        const uint64_t t1 =
+            benchmark_cycles([&]() { matmul_blocked(a, b, c1, s.m, s.k, s.n, block); });
+        const uint64_t t2 =
+            benchmark_cycles([&]() { matmul_blocked_simd(a, b, c2, s.m, s.k, s.n, block); });
+        const uint64_t t3 =
+            benchmark_cycles([&]() { matmul_blocked_simd_ipj(a, b, c3, s.m, s.k, s.n, block); });
 
         const double sb = t1 > 0 ? static_cast<double>(t0) / static_cast<double>(t1) : 0.0;
         const double ss = t2 > 0 ? static_cast<double>(t0) / static_cast<double>(t2) : 0.0;
         const double sipj = t3 > 0 ? static_cast<double>(t0) / static_cast<double>(t3) : 0.0;
 
-        std::cout << std::setw(15) << s.name << " | " << std::setw(9) << t0 << " | " << std::setw(11) << t1 << " | "
-            << std::setw(11) << t3 << " | " << std::setw(8) << t2 << " | " << std::setw(6) << sb << " | " << std::setw(9) << sipj << " | " << std::setw(7) << ss << " | "  << "\n";
+        std::cout << std::setw(15) << s.name << " | " << std::setw(9) << t0 << " | "
+                  << std::setw(11) << t1 << " | " << std::setw(11) << t3 << " | " << std::setw(8)
+                  << t2 << " | " << std::setw(6) << sb << " | " << std::setw(9) << sipj << " | "
+                  << std::setw(7) << ss << " | " << "\n";
     }
 #else
     std::cout << "case | naive @ | blocked @ | speedup\n";
     std::cout << "-------------------------------------------------------\n";
 
-    for (const Shape& s : shapes) {
+    for (const Shape &s : shapes) {
         Matrix a = random_matrix(s.m, s.k, 777u + static_cast<unsigned>(s.m + s.k + s.n));
         Matrix b = random_matrix(s.k, s.n, 999u + static_cast<unsigned>(s.m + s.k + s.n));
         Matrix c0(s.m * s.n), c1(s.m * s.n);
 
         const uint64_t t0 = benchmark_cycles([&]() { matmul_naive(a, b, c0, s.m, s.k, s.n); });
-        const uint64_t t1 = benchmark_cycles([&]() { matmul_blocked(a, b, c1, s.m, s.k, s.n, block); });
+        const uint64_t t1 =
+            benchmark_cycles([&]() { matmul_blocked(a, b, c1, s.m, s.k, s.n, block); });
         const double sp = t1 > 0 ? static_cast<double>(t0) / static_cast<double>(t1) : 0.0;
 
-        std::cout << std::setw(14) << s.name << " | " << std::setw(9) << t0 << " | " << std::setw(11) << t1 << " | "
-                  << std::setw(7) << sp << " | " << "\n";
+        std::cout << std::setw(14) << s.name << " | " << std::setw(9) << t0 << " | "
+                  << std::setw(11) << t1 << " | " << std::setw(7) << sp << " | " << "\n";
     }
 #endif
 

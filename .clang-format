@@ -1,0 +1,25 @@
+# .clang-format
+BasedOnStyle: LLVM
+
+IndentWidth: 4
+UseTab: Never
+
+# int &x
+ReferenceAlignment: Right
+PointerAlignment: Right
+
+# foo() {}
+AllowShortFunctionsOnASingleLine: Empty
+
+# if (...)
+#   return;
+AllowShortIfStatementsOnASingleLine: Never
+# for (...)
+#   return;
+AllowShortLoopsOnASingleLine: False
+
+# class Cls {
+# public: ...
+AccessModifierOffset: -4
+
+ColumnLimit: 100
