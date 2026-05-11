@@ -38,7 +38,7 @@ make test
 
 ## Оптимизация
 
-В качестве оптимизации представлена векторизованная версия [logf_avx2.cpp](logf_avx2.cpp). Функция `__m256 logf8_avx2(__m256 x)` обрабатывает 8 `float` за вызов с использованием `AVX2 + FMA`. Математика как в [logf.cpp](logf.cpp) в области нормализованные положительные конечных чисел без особых случаев.
+В качестве оптимизации представлена векторизованная версия [logf_avx2.cpp](logf_avx2.cpp). Функция `__m256 logf8_avx2(__m256 x)` обрабатывает 8 `float` за вызов с использованием `AVX2 + FMA`. Математика как в [logf.cpp](logf.cpp) в области нормализованныx положительныx конечных чисел без особых случаев.
 
 Тесты реализации в [test_logf_avx2.cpp](test_logf_avx2.cpp). 
 Сборка и запуск:
@@ -46,7 +46,7 @@ make test
 make test_avx2
 ```
 
-### Производительность
+## Производительность
 
 Для измерения производительности реализован бенчмарк [perftest.cpp](perftest.cpp).
 
@@ -57,13 +57,13 @@ make test_avx2
 make perf
 ```
 
-#### Результаты эксперимента
+### Результаты эксперимента
 
 Параметры замеров: `ITERS = 5'000'000`, `WARMUP_RUNS = 4`, `MEASURE_RUNS = 13`, `SCALAR_LANES = 8`, `VECTOR_LANES = 4`.
 
 ```text
-Performance test: libm logf vs user logf vs vector logf8_avx2
-iters=5000000, warmup_runs=4, measure_runs=13, scalar_lanes=8, vector_lanes=4 (x8 floats)
+Performance test: libm logf vs custom logf vs vector logf8_avx2
+iters=5000000, warmup_runs=4, measure_runs=13, scalar_lanes=8, vector_lanes=4
 
 Libm logf latency (CPE):
 	median_cpe  = 30.444058
@@ -73,11 +73,11 @@ Libm logf throughput (CPE):
 	median_cpe  = 8.267031
 	cv_percent  = 4.272907%
 
-User logf latency (CPE):
+Custom logf latency (CPE):
 	median_cpe  = 84.945340
 	cv_percent  = 0.141391%
 
-User logf throughput (CPE):
+Custom logf throughput (CPE):
 	median_cpe  = 23.441980
 	cv_percent  = 4.722811%
 
@@ -90,10 +90,10 @@ Vector logf8_avx2 throughput (CPE):
 	cv_percent  = 4.437303%
 
 Speedup vs vector (median CPE, lower is better; ratio = slower/faster):
-	latency:    libm=30.444058  user=84.945340  vector=9.930106
-	            libm/vector=3.065834  user/vector=8.554324
-	throughput: libm=8.267031  user=23.441980  vector=4.701558
-	            libm/vector=1.758360  user/vector=4.986003
+	latency:    libm=30.444058  custom=84.945340  vector=9.930106
+	            libm/vector=3.065834  custom/vector=8.554324
+	throughput: libm=8.267031  custom=23.441980  vector=4.701558
+	            libm/vector=1.758360  custom/vector=4.986003
 ```
 
 По **throughput** медиана `logf8_avx2` около **4.70 CPE**, в **1.76** раза быстрее `std::log` и в **4.99** раза быстрее скалярного `logf`. По **latency** векторная реализация **9.93 CPE**, в **3.07** раза быстрее `std::log` из libm и в **8.55** раза быстрее пользовательского скаляра. 

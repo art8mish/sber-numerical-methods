@@ -176,10 +176,10 @@ int main() {
     }
 
     std::cout << std::format(
-        "Performance test: libm logf vs user logf vs vector logf8_avx2\n"
+        "Performance test: libm logf vs custom logf vs vector logf8_avx2\n"
         "iters={}, warmup_runs={}, measure_runs={}, scalar_lanes={}, "
-        "vector_lanes={} (x{} floats)\n\n",
-        ITERS, WARMUP_RUNS, MEASURE_RUNS, SCALAR_LANES, VECTOR_LANES, VEC_WIDTH);
+        "vector_lanes={}\n\n",
+        ITERS, WARMUP_RUNS, MEASURE_RUNS, SCALAR_LANES, VECTOR_LANES);
 
     const double ml = print_and_median(
         "Libm logf latency (CPE)", collect(ITERS, [&] {
@@ -190,11 +190,11 @@ int main() {
             return bench_scalar<SCALAR_LANES>(ITERS, libm_logf);
         }));
     const double ul = print_and_median(
-        "User logf latency (CPE)", collect(ITERS, [&] {
+        "Custom logf latency (CPE)", collect(ITERS, [&] {
             return bench_scalar<1>(ITERS, ::logf);
         }));
     const double ut = print_and_median(
-        "User logf throughput (CPE)", collect(ITERS * SCALAR_LANES, [&] {
+        "Custom logf throughput (CPE)", collect(ITERS * SCALAR_LANES, [&] {
             return bench_scalar<SCALAR_LANES>(ITERS, ::logf);
         }));
     const double vl = print_and_median(
@@ -209,10 +209,10 @@ int main() {
 
     std::cout << std::format(
         "Speedup vs vector (median CPE, lower is better; ratio = slower/faster):\n"
-        "\tlatency:    libm={:.6f}  user={:.6f}  vector={:.6f}\n"
-        "\t            libm/vector={:.6f}  user/vector={:.6f}\n"
-        "\tthroughput: libm={:.6f}  user={:.6f}  vector={:.6f}\n"
-        "\t            libm/vector={:.6f}  user/vector={:.6f}\n",
+        "\tlatency:    libm={:.6f}  custom={:.6f}  vector={:.6f}\n"
+        "\t            libm/vector={:.6f}  custom/vector={:.6f}\n"
+        "\tthroughput: libm={:.6f}  custom={:.6f}  vector={:.6f}\n"
+        "\t            libm/vector={:.6f}  custom/vector={:.6f}\n",
         ml, ul, vl, ml / vl, ul / vl, mt, ut, vt, mt / vt, ut / vt);
 
     return 0;
