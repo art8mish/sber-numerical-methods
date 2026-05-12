@@ -26,10 +26,8 @@ inline double black_scholes_call(double s0, double k, double r, double sigma, do
         return std::max(s0 - k, 0.0);
     }
     const double sig_sqrt_t = sigma * std::sqrt(tau);
-    const double y_plus =
-        (std::log(s0 / k) + tau * (r + 0.5 * sigma * sigma)) / sig_sqrt_t;
-    const double y_minus =
-        (std::log(s0 / k) + tau * (r - 0.5 * sigma * sigma)) / sig_sqrt_t;
+    const double y_plus = (std::log(s0 / k) + tau * (r + 0.5 * sigma * sigma)) / sig_sqrt_t;
+    const double y_minus = (std::log(s0 / k) + tau * (r - 0.5 * sigma * sigma)) / sig_sqrt_t;
     return s0 * norm_cdf(y_plus) - k * std::exp(-r * tau) * norm_cdf(y_minus);
 }
 
@@ -41,7 +39,7 @@ struct OptionParams {
     double t{};
 };
 
-void generate_params(std::uint64_t master_seed, std::vector<OptionParams>& out) {
+void generate_params(std::uint64_t master_seed, std::vector<OptionParams> &out) {
     out.resize(NUM_OPTIONS);
     std::mt19937_64 gen(master_seed);
     std::uniform_real_distribution<double> u_s0(80.0, 120.0);
@@ -58,11 +56,8 @@ void generate_params(std::uint64_t master_seed, std::vector<OptionParams>& out) 
     }
 }
 
-double mc_call_exact_sum(
-    const OptionParams& p,
-    std::uint64_t path_seed,
-    std::vector<double>& z_block
-) {
+double mc_call_exact_sum(const OptionParams &p, std::uint64_t path_seed,
+                         std::vector<double> &z_block) {
     std::mt19937_64 gen(path_seed);
     std::normal_distribution<double> normal(0.0, 1.0);
 
@@ -92,7 +87,7 @@ double mc_call_exact_sum(
     return sum_payoff;
 }
 
-}  // namespace
+} // namespace
 
 int main() {
     constexpr std::uint64_t MASTER_SEED = 42;
@@ -110,7 +105,7 @@ int main() {
 #pragma omp parallel for schedule(static)
 #endif
     for (int i = 0; i < NUM_OPTIONS; ++i) {
-        const OptionParams& p = params[static_cast<std::size_t>(i)];
+        const OptionParams &p = params[static_cast<std::size_t>(i)];
         analytical[i] = black_scholes_call(p.s0, p.k, p.r, p.sigma, p.t);
 
         const std::uint64_t path_seed =
@@ -151,16 +146,16 @@ int main() {
     std::cout << "First " << show << " options:\n";
     std::cout << std::setw(4) << std::right << "i" << std::setw(12) << "S0" << std::setw(12) << "K"
               << std::setw(10) << "r" << std::setw(10) << "sigma" << std::setw(10) << "T"
-              << std::setw(14) << "C_analytic" << std::setw(14) << "C_MC" << std::setw(12) << "abs_err"
-              << "\n";
+              << std::setw(14) << "C_analytic" << std::setw(14) << "C_MC" << std::setw(12)
+              << "abs_err" << "\n";
     std::cout << std::string(94, '-') << "\n";
     for (int i = 0; i < show; ++i) {
-        const OptionParams& p = params[static_cast<std::size_t>(i)];
-        std::cout << std::setw(4) << std::right << i << std::setw(12) << p.s0 << std::setw(12) << p.k
-                  << std::setw(10) << p.r << std::setw(10) << p.sigma << std::setw(10) << p.t
-                  << std::setw(14) << analytical[static_cast<std::size_t>(i)]
-                  << std::setw(14) << mc_price[static_cast<std::size_t>(i)]
-                  << std::setw(12) << abs_err[static_cast<std::size_t>(i)] << "\n";
+        const OptionParams &p = params[static_cast<std::size_t>(i)];
+        std::cout << std::setw(4) << std::right << i << std::setw(12) << p.s0 << std::setw(12)
+                  << p.k << std::setw(10) << p.r << std::setw(10) << p.sigma << std::setw(10) << p.t
+                  << std::setw(14) << analytical[static_cast<std::size_t>(i)] << std::setw(14)
+                  << mc_price[static_cast<std::size_t>(i)] << std::setw(12)
+                  << abs_err[static_cast<std::size_t>(i)] << "\n";
     }
 
     return 0;

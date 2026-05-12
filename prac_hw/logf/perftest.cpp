@@ -177,25 +177,21 @@ int main() {
                              "vector_lanes={}\n\n",
                              ITERS, WARMUP_RUNS, MEASURE_RUNS, SCALAR_LANES, VECTOR_LANES);
 
-    const double ml =
-        median("Libm logf latency (CPE)",
-                         collect(ITERS, [&] { return bench_scalar<1>(ITERS, libm_logf); }));
-    const double mt =
-        median("Libm logf throughput (CPE)", collect(ITERS * SCALAR_LANES, [&] {
-                             return bench_scalar<SCALAR_LANES>(ITERS, libm_logf);
-                         }));
-    const double ul =
-        median("Custom logf latency (CPE)",
-                         collect(ITERS, [&] { return bench_scalar<1>(ITERS, ::logf); }));
-    const double ut = median(
-        "Custom logf throughput (CPE)",
-        collect(ITERS * SCALAR_LANES, [&] { return bench_scalar<SCALAR_LANES>(ITERS, ::logf); }));
-    const double vl =
-        median("Vector logf8_avx2 latency (CPE)",
-                         collect(ITERS * VEC_WIDTH, [&] { return bench_vector<1>(ITERS); }));
+    const double ml = median("Libm logf latency (CPE)",
+                             collect(ITERS, [&] { return bench_scalar<1>(ITERS, libm_logf); }));
+    const double mt = median("Libm logf throughput (CPE)", collect(ITERS * SCALAR_LANES, [&] {
+                                 return bench_scalar<SCALAR_LANES>(ITERS, libm_logf);
+                             }));
+    const double ul = median("Custom logf latency (CPE)",
+                             collect(ITERS, [&] { return bench_scalar<1>(ITERS, ::logf); }));
+    const double ut = median("Custom logf throughput (CPE)", collect(ITERS * SCALAR_LANES, [&] {
+                                 return bench_scalar<SCALAR_LANES>(ITERS, ::logf);
+                             }));
+    const double vl = median("Vector logf8_avx2 latency (CPE)",
+                             collect(ITERS * VEC_WIDTH, [&] { return bench_vector<1>(ITERS); }));
     const double vt = median("Vector logf8_avx2 throughput (CPE)",
-                                       collect(ITERS * VECTOR_LANES * VEC_WIDTH,
-                                               [&] { return bench_vector<VECTOR_LANES>(ITERS); }));
+                             collect(ITERS * VECTOR_LANES * VEC_WIDTH,
+                                     [&] { return bench_vector<VECTOR_LANES>(ITERS); }));
 
     std::cout << std::format(
         "Speedup vs vector (median CPE, lower is better; ratio = slower/faster):\n"
