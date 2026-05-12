@@ -1,3 +1,5 @@
 .venv
 __pycache__/
 ./convergence.png
+build/
+call_options_mc
